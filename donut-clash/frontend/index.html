@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Donut Clash</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="logo">🍩 Donut Clash</div>
+    <div id="balanceBox" class="balance-box hidden">
+      <span class="balance-label">Saldo:</span>
+      <span id="balanceValue">0</span>
+      <span class="balance-unit">donuts</span>
+    </div>
+  </header>
+
+  <main id="app">
+
+    <!-- PANTALLA 1: VINCULAR CUENTA -->
+    <section id="linkScreen" class="screen">
+      <div class="card">
+        <h1>Vincula tu cuenta de Minecraft</h1>
+        <p class="muted">Introduce tu usuario de Minecraft para generar un código de verificación.</p>
+
+        <div id="step1">
+          <input id="mcUsername" type="text" placeholder="Tu usuario de Minecraft" maxlength="16">
+          <button id="generateBtn" class="btn-primary">Generar código</button>
+        </div>
+
+        <div id="step2" class="hidden">
+          <p class="muted">Entra al servidor y ejecuta este comando exactamente:</p>
+          <div class="code-box">
+            <span id="payCommand">/pay Donaciones ###</span>
+          </div>
+          <p class="muted small">
+            Esto envía un pago de prueba con el código <strong id="codeValue">000</strong> a la cuenta del sistema
+            para confirmar que el usuario te pertenece. Estamos esperando la confirmación...
+          </p>
+          <div class="spinner"></div>
+          <p id="pollingStatus" class="muted small">Comprobando vinculación cada 5 segundos...</p>
+          <button id="cancelLinkBtn" class="btn-secondary">Cancelar</button>
+        </div>
+
+        <p id="linkError" class="error hidden"></p>
+      </div>
+    </section>
+
+    <!-- PANTALLA 2: JUEGOS -->
+    <section id="gamesScreen" class="screen hidden">
+      <div class="games-header">
+        <h1>Elige tu juego</h1>
+        <p class="muted">Bienvenido, <strong id="welcomeUser"></strong></p>
+      </div>
+
+      <div class="games-grid">
+        <div class="game-card" data-game="mines">
+          <div class="game-icon">💣</div>
+          <h2>Mines</h2>
+          <p class="muted">Evita las minas y multiplica tu apuesta.</p>
+        </div>
+        <div class="game-card" data-game="crash">
+          <div class="game-icon">📈</div>
+          <h2>Crash</h2>
+          <p class="muted">Retira antes de que el cohete explote.</p>
+        </div>
+        <div class="game-card" data-game="coinflip">
+          <div class="game-icon">🪙</div>
+          <h2>Coinflip</h2>
+          <p class="muted">Cara o cruz real, 50/50. Pago x1.4.</p>
+        </div>
+      </div>
+
+      <div id="gameArea" class="game-area hidden"></div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p class="muted small">
+      Donut Clash utiliza una moneda virtual sin valor monetario real ("donuts").
+      Juega de forma responsable. Servicio no disponible para menores según las reglas del servidor.
+    </p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
