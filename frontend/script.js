@@ -1,8 +1,6 @@
 // ==============================
 // CONFIGURACIÓN
 // ==============================
-// Cambia esto por la URL real de tu despliegue en Vercel, por ejemplo:
-// const API_BASE_URL = "https://donut-clash-api.vercel.app/api";
 const API_BASE_URL = "https://donut-clash-rho.vercel.app/api";
 
 // ==============================
@@ -30,20 +28,31 @@ function getOrCreateClientSeed() {
 // ==============================
 // ELEMENTOS DEL DOM
 // ==============================
-const linkScreen   = document.getElementById("linkScreen");
-const gamesScreen  = document.getElementById("gamesScreen");
-const step1        = document.getElementById("step1");
-const step2        = document.getElementById("step2");
-const mcUsername   = document.getElementById("mcUsername");
-const generateBtn  = document.getElementById("generateBtn");
-const cancelLinkBtn= document.getElementById("cancelLinkBtn");
-const payCommand   = document.getElementById("payCommand");
-const codeValue    = document.getElementById("codeValue");
-const linkError    = document.getElementById("linkError");
-const balanceBox   = document.getElementById("balanceBox");
 const balanceValue = document.getElementById("balanceValue");
-const welcomeUser  = document.getElementById("welcomeUser");
-const gameArea     = document.getElementById("gameArea");
+const signInBtn = document.getElementById("signInBtn");
+const registerBtn = document.getElementById("registerBtn");
+const langSelect = document.getElementById("langSelect");
+
+const authModal = document.getElementById("authModal");
+const modalClose = document.getElementById("modalClose");
+const modalStep1 = document.getElementById("modalStep1");
+const modalStep2 = document.getElementById("modalStep2");
+const modalAlreadyLinked = document.getElementById("modalAlreadyLinked");
+const modalAlreadyCloseBtn = document.getElementById("modalAlreadyCloseBtn");
+
+const mcUsername = document.getElementById("mcUsername");
+const generateBtn = document.getElementById("generateBtn");
+const cancelLinkBtn = document.getElementById("cancelLinkBtn");
+const payCommand = document.getElementById("payCommand");
+const linkError = document.getElementById("linkError");
+
+const gameArea = document.getElementById("gameArea");
+
+// ==============================
+// IDIOMA
+// ==============================
+langSelect.addEventListener("change", () => setLanguage(langSelect.value));
+applyTranslations(); // aplica "en" por defecto al cargar
 
 // ==============================
 // UTILIDADES
@@ -62,9 +71,37 @@ async function apiFetch(path, options = {}){
     ...options,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Error de red");
+  if (!res.ok) throw new Error(data.error || "Network error");
   return data;
 }
+function updateBalanceDisplay(){
+  balanceValue.textContent = state.balance;
+}
+
+// ==============================
+// MODAL: abrir / cerrar
+// ==============================
+function openModal(){
+  authModal.classList.remove("hidden");
+  if (state.sessionToken){
+    modalStep1.classList.add("hidden");
+    modalStep2.classList.add("hidden");
+    modalAlreadyLinked.classList.remove("hidden");
+  } else {
+    modalAlreadyLinked.classList.add("hidden");
+    modalStep2.classList.add("hidden");
+    modalStep1.classList.remove("hidden");
+  }
+}
+function closeModal(){
+  authModal.classList.add("hidden");
+}
+
+signInBtn.addEventListener("click", openModal);
+registerBtn.addEventListener("click", openModal);
+modalClose.addEventListener("click", closeModal);
+modalAlreadyCloseBtn.addEventListener("click", closeModal);
+authModal.addEventListener("click", (e) => { if (e.target === authModal) closeModal(); });
 
 // ==============================
 // PASO 1: GENERAR CÓDIGO
@@ -74,12 +111,11 @@ generateBtn.addEventListener("click", async () => {
   clearError();
 
   if (!username) {
-    showError("Introduce un nombre de usuario válido.");
+    showError(t("error.usernameRequired"));
     return;
   }
 
   generateBtn.disabled = true;
-  generateBtn.textContent = "Generando...";
 
   try {
     const data = await apiFetch("/generate-code", {
@@ -88,25 +124,23 @@ generateBtn.addEventListener("click", async () => {
     });
 
     state.username = username;
-    codeValue.textContent = data.code;
     payCommand.textContent = `/pay Donaciones ${data.code}`;
 
-    step1.classList.add("hidden");
-    step2.classList.remove("hidden");
+    modalStep1.classList.add("hidden");
+    modalStep2.classList.remove("hidden");
 
     startPolling();
   } catch (err) {
-    showError(err.message);
+    showError(t("error.genericPrefix") + err.message);
   } finally {
     generateBtn.disabled = false;
-    generateBtn.textContent = "Generar código";
   }
 });
 
 cancelLinkBtn.addEventListener("click", () => {
   stopPolling();
-  step2.classList.add("hidden");
-  step1.classList.remove("hidden");
+  modalStep2.classList.add("hidden");
+  modalStep1.classList.remove("hidden");
   state.username = null;
 });
 
@@ -138,61 +172,45 @@ async function checkLinkStatus(){
         });
         state.sessionToken = session.session_token;
       } catch (err) {
-        // Si la sesión ya fue reclamada antes (recarga de página, etc.),
-        // igual dejamos ver el saldo, pero sin poder apostar hasta re-vincular.
-        console.error("No se pudo reclamar la sesión:", err.message);
+        console.error("Could not claim session:", err.message);
       }
-      enterGamesScreen(data);
+      state.balance = data.balance || 0;
+      updateBalanceDisplay();
+      closeModal();
+      setInterval(refreshBalance, 5000);
     }
   } catch (err) {
-    // Silencioso: el usuario aún no ha completado el pago, seguimos esperando.
+    // Silencioso: el usuario aún no ha completado el pago.
   }
 }
 
-// ==============================
-// PANTALLA DE JUEGOS
-// ==============================
-function enterGamesScreen(userData){
-  state.balance = userData.balance || 0;
-
-  linkScreen.classList.add("hidden");
-  gamesScreen.classList.remove("hidden");
-  balanceBox.classList.remove("hidden");
-
-  welcomeUser.textContent = state.username;
-  updateBalanceDisplay();
-
-  document.querySelectorAll(".game-card").forEach(card => {
-    card.addEventListener("click", () => openGame(card.dataset.game));
-  });
-
-  // Refrescamos el saldo real desde la API cada 5s también en esta pantalla
-  setInterval(refreshBalance, 5000);
-}
-
 async function refreshBalance(){
+  if (!state.username) return;
   try {
     const data = await apiFetch(`/user/${encodeURIComponent(state.username)}`);
     state.balance = data.balance;
     updateBalanceDisplay();
   } catch (err) {
-    console.error("No se pudo refrescar el saldo:", err.message);
+    console.error("Could not refresh balance:", err.message);
   }
 }
 
-function updateBalanceDisplay(){
-  balanceValue.textContent = state.balance;
-}
-
 // ==============================
-// JUEGOS (conectados al backend real — el resultado siempre lo decide
-// el servidor con lógica provably-fair; el cliente nunca determina quién
-// gana, solo muestra lo que la API responde).
+// ACCESO A LOS JUEGOS (bloqueado sin cuenta vinculada)
 // ==============================
+document.querySelectorAll("[data-game]").forEach((el) => {
+  el.addEventListener("click", () => {
+    if (!state.sessionToken) {
+      openModal();
+      return;
+    }
+    openGame(el.dataset.game);
+  });
+});
 
 function requireSession(){
   if (!state.sessionToken) {
-    alert("Tu sesión no es válida. Recarga la página y vuelve a vincular tu cuenta.");
+    alert(t("error.needLink"));
     return false;
   }
   return true;
@@ -209,12 +227,12 @@ function openGame(game){
 // ---------- COINFLIP ----------
 function renderCoinflip(){
   gameArea.innerHTML = `
-    <h2>🪙 Coinflip</h2>
-    <p class="muted small">Moneda real 50/50 · pago x1.4 (margen de la casa incluido).</p>
-    <input type="number" class="bet-input" id="coinBet" placeholder="Apuesta" min="1" value="10">
+    <h2>🪙 ${t("game.coinflip.name")}</h2>
+    <p class="muted small">${t("game.coinflip.info")}</p>
+    <input type="number" class="bet-input" id="coinBet" min="1" value="10">
     <div>
-      <button class="btn-secondary" id="pickHeads">Cara</button>
-      <button class="btn-secondary" id="pickTails">Cruz</button>
+      <button class="btn-secondary" id="pickHeads">${t("game.coinflip.heads")}</button>
+      <button class="btn-secondary" id="pickTails">${t("game.coinflip.tails")}</button>
     </div>
     <div class="coin" id="coinDisplay">🪙</div>
     <p id="coinResult" class="muted small"></p>
@@ -223,7 +241,7 @@ function renderCoinflip(){
   const flip = async (choice) => {
     if (!requireSession()) return;
     const bet = Number(document.getElementById("coinBet").value) || 0;
-    document.getElementById("coinResult").textContent = "Lanzando...";
+    document.getElementById("coinResult").textContent = "...";
     try {
       const data = await apiFetch("/bet/coinflip", {
         method: "POST",
@@ -237,12 +255,12 @@ function renderCoinflip(){
       });
       document.getElementById("coinDisplay").textContent = data.result === "heads" ? "😀" : "🌑";
       document.getElementById("coinResult").textContent = data.won
-        ? `¡Ganaste! +${data.payout} donuts.`
-        : `Perdiste ${bet} donuts.`;
+        ? `${t("game.coinflip.won")}${data.payout} ${t("donuts")}.`
+        : `${t("game.coinflip.lost")}${bet} ${t("donuts")}.`;
       state.balance = data.balance;
       updateBalanceDisplay();
     } catch (err) {
-      document.getElementById("coinResult").textContent = `Error: ${err.message}`;
+      document.getElementById("coinResult").textContent = t("error.genericPrefix") + err.message;
     }
   };
 
@@ -253,16 +271,14 @@ function renderCoinflip(){
 // ---------- MINES ----------
 function renderMines(){
   gameArea.innerHTML = `
-    <h2>💣 Mines</h2>
-    <p class="muted small">Elige cuántas bombas quieres arriesgar y empieza la partida.</p>
-    <input type="number" class="bet-input" id="minesBet" placeholder="Apuesta" min="1" value="10">
-    <input type="number" class="bet-input" id="minesBombs" placeholder="Bombas (1-24)" min="1" max="24" value="3">
-    <button class="btn-primary" id="minesStartBtn">Empezar partida</button>
+    <h2>💣 ${t("game.mines.name")}</h2>
+    <input type="number" class="bet-input" id="minesBet" min="1" value="10">
+    <input type="number" class="bet-input" id="minesBombs" min="1" max="24" value="3" title="${t('game.mines.bombsLabel')}">
+    <button class="btn-primary" id="minesStartBtn">${t("game.common.start")}</button>
     <div class="mines-grid hidden" id="minesGrid"></div>
-    <button class="btn-secondary hidden" id="minesCashoutBtn">Retirar</button>
+    <button class="btn-secondary hidden" id="minesCashoutBtn">${t("game.common.cashout")}</button>
     <p id="minesResult" class="muted small"></p>
   `;
-
   document.getElementById("minesStartBtn").addEventListener("click", startMinesGame);
 }
 
@@ -306,7 +322,7 @@ async function startMinesGame(){
     cashoutBtn.classList.remove("hidden");
     cashoutBtn.onclick = cashoutMines;
   } catch (err) {
-    resultEl.textContent = `Error: ${err.message}`;
+    resultEl.textContent = t("error.genericPrefix") + err.message;
   }
 }
 
@@ -328,18 +344,18 @@ async function revealMinesTile(tileIndex, tileEl){
     if (data.result === "bomb"){
       tileEl.classList.add("revealed-bomb");
       tileEl.textContent = "💣";
-      resultEl.textContent = "¡Boom! Perdiste la apuesta.";
+      resultEl.textContent = t("game.mines.boom");
       finishMinesUI(data.bomb_positions);
     } else {
       tileEl.classList.add("revealed-safe");
       tileEl.textContent = "💎";
-      resultEl.textContent = `Multiplicador actual: ${data.current_multiplier.toFixed(2)}x`;
+      resultEl.textContent = `${t("game.mines.multiplierPrefix")}${data.current_multiplier.toFixed(2)}x`;
       if (data.board_fully_cleared) {
-        resultEl.textContent += " · ¡Tablero completo! Retira ahora.";
+        resultEl.textContent += t("game.mines.boardCleared");
       }
     }
   } catch (err) {
-    resultEl.textContent = `Error: ${err.message}`;
+    resultEl.textContent = t("error.genericPrefix") + err.message;
   }
 }
 
@@ -356,12 +372,12 @@ async function cashoutMines(){
         game_id: state.activeMinesGameId,
       }),
     });
-    resultEl.textContent = `Retiraste en ${data.multiplier.toFixed(2)}x. Ganaste ${data.payout} donuts.`;
+    resultEl.textContent = `${t("game.crash.wonPrefix")}${data.multiplier.toFixed(2)}x. ${t("game.crash.wonMiddle")}${data.payout} ${t("donuts")}.`;
     state.balance = data.balance;
     updateBalanceDisplay();
     finishMinesUI(data.bomb_positions);
   } catch (err) {
-    resultEl.textContent = `Error: ${err.message}`;
+    resultEl.textContent = t("error.genericPrefix") + err.message;
   }
 }
 
@@ -386,15 +402,14 @@ function finishMinesUI(bombPositions){
 // ---------- CRASH ----------
 function renderCrash(){
   gameArea.innerHTML = `
-    <h2>📈 Crash</h2>
-    <p class="muted small">El punto de choque ya está decidido (provably-fair) y oculto. Retira antes de que reviente.</p>
-    <input type="number" class="bet-input" id="crashBet" placeholder="Apuesta" min="1" value="10">
+    <h2>📈 ${t("game.crash.name")}</h2>
+    <p class="muted small">${t("game.crash.info")}</p>
+    <input type="number" class="bet-input" id="crashBet" min="1" value="10">
     <div class="crash-display" id="crashMultiplier">1.00x</div>
-    <button class="btn-primary" id="crashStart">Apostar</button>
-    <button class="btn-secondary hidden" id="crashCashout">Retirar</button>
+    <button class="btn-primary" id="crashStart">${t("game.common.bet")}</button>
+    <button class="btn-secondary hidden" id="crashCashout">${t("game.common.cashout")}</button>
     <p id="crashResult" class="muted small"></p>
   `;
-
   document.getElementById("crashStart").addEventListener("click", startCrashGame);
 }
 
@@ -431,7 +446,7 @@ async function startCrashGame(){
 
     cashoutBtn.onclick = () => cashoutCrash(startBtn, cashoutBtn);
   } catch (err) {
-    resultEl.textContent = `Error: ${err.message}`;
+    resultEl.textContent = t("error.genericPrefix") + err.message;
   }
 }
 
@@ -452,15 +467,15 @@ async function cashoutCrash(startBtn, cashoutBtn){
 
     if (data.result === "crashed"){
       document.getElementById("crashMultiplier").textContent = data.crash_point.toFixed(2) + "x";
-      resultEl.textContent = "💥 Se estrelló antes de que retiraras. Perdiste la apuesta.";
+      resultEl.textContent = t("game.crash.crashed");
     } else {
       document.getElementById("crashMultiplier").textContent = data.multiplier.toFixed(2) + "x";
-      resultEl.textContent = `Retiraste en ${data.multiplier.toFixed(2)}x. Ganaste ${data.payout} donuts.`;
+      resultEl.textContent = `${t("game.crash.wonPrefix")}${data.multiplier.toFixed(2)}x. ${t("game.crash.wonMiddle")}${data.payout} ${t("donuts")}.`;
       state.balance = data.balance;
       updateBalanceDisplay();
     }
   } catch (err) {
-    resultEl.textContent = `Error: ${err.message}`;
+    resultEl.textContent = t("error.genericPrefix") + err.message;
   } finally {
     state.activeCrashGameId = null;
     cashoutBtn.classList.add("hidden");

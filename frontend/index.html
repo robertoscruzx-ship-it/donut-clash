@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,83 +8,130 @@
 </head>
 <body>
 
-  <header class="topbar">
-    <div class="logo">🍩 Donut Clash</div>
-    <div id="balanceBox" class="balance-box hidden">
-      <span class="balance-label">Saldo:</span>
-      <span id="balanceValue">0</span>
-      <span class="balance-unit">donuts</span>
-    </div>
-  </header>
+  <div id="appShell">
 
-  <main id="app">
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="logo">🍩 <span>Donut</span><span class="accent">Clash</span></div>
 
-    <!-- PANTALLA 1: VINCULAR CUENTA -->
-    <section id="linkScreen" class="screen">
-      <div class="card">
-        <h1>Vincula tu cuenta de Minecraft</h1>
-        <p class="muted">Introduce tu usuario de Minecraft para generar un código de verificación.</p>
-
-        <div id="step1">
-          <input id="mcUsername" type="text" placeholder="Tu usuario de Minecraft" maxlength="16">
-          <button id="generateBtn" class="btn-primary">Generar código</button>
+      <div class="topbar-right">
+        <div class="balance-pill">
+          <span class="coin-icon">🪙</span>
+          <span id="balanceValue">0</span>
         </div>
+        <button id="signInBtn" class="btn-ghost" data-i18n="nav.signIn">Sign In</button>
+        <button id="registerBtn" class="btn-accent-sm" data-i18n="nav.register">Register</button>
+        <select id="langSelect" class="lang-select" aria-label="Language">
+          <option value="en">EN</option>
+          <option value="es">ES</option>
+          <option value="pt">PT</option>
+          <option value="fr">FR</option>
+        </select>
+      </div>
+    </header>
 
-        <div id="step2" class="hidden">
-          <p class="muted">Entra al servidor y ejecuta este comando exactamente:</p>
-          <div class="code-box">
-            <span id="payCommand">/pay Donaciones ###</span>
+    <div class="body-shell">
+
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="sidebar-title" data-i18n="sidebar.games">GAMES</div>
+        <nav class="sidebar-nav">
+          <button class="sidebar-item" data-game="mines">
+            <span class="icon">💣</span><span data-i18n="game.mines.name">Mines</span>
+          </button>
+          <button class="sidebar-item" data-game="crash">
+            <span class="icon">📈</span><span data-i18n="game.crash.name">Crash</span>
+          </button>
+          <button class="sidebar-item" data-game="coinflip">
+            <span class="icon">🪙</span><span data-i18n="game.coinflip.name">Coinflip</span>
+          </button>
+        </nav>
+        <button class="sidebar-item sidebar-discord" disabled title="Coming soon">
+          <span class="icon">💬</span><span data-i18n="sidebar.discord">Discord</span>
+        </button>
+      </aside>
+
+      <!-- MAIN CONTENT -->
+      <main class="main-content">
+
+        <section class="hero">
+          <h1><span class="hero-brand">DONUT CLASH</span> <span class="hero-accent" data-i18n="hero.title2">CASINO</span></h1>
+          <p class="muted" data-i18n="hero.subtitle">Play with your donuts on provably fair games, then cash back out in-game.</p>
+        </section>
+
+        <section class="discord-banner">
+          <div>
+            <strong data-i18n="banner.title">Join our Discord community</strong>
+            <p class="muted small" data-i18n="banner.subtitle">Giveaways, events and updates — coming soon.</p>
           </div>
-          <p class="muted small">
-            Esto envía un pago de prueba con el código <strong id="codeValue">000</strong> a la cuenta del sistema
-            para confirmar que el usuario te pertenece. Estamos esperando la confirmación...
-          </p>
-          <div class="spinner"></div>
-          <p id="pollingStatus" class="muted small">Comprobando vinculación cada 5 segundos...</p>
-          <button id="cancelLinkBtn" class="btn-secondary">Cancelar</button>
-        </div>
+          <button class="btn-secondary" disabled data-i18n="banner.button">Coming soon</button>
+        </section>
 
+        <section class="featured">
+          <h2 data-i18n="featured.title">Featured Games</h2>
+          <div class="games-grid">
+            <div class="game-card" data-game="mines">
+              <div class="game-icon">💣</div>
+              <h3 data-i18n="game.mines.name">Mines</h3>
+              <p class="muted" data-i18n="game.mines.desc">Avoid the mines and multiply your bet.</p>
+            </div>
+            <div class="game-card" data-game="crash">
+              <div class="game-icon">📈</div>
+              <h3 data-i18n="game.crash.name">Crash</h3>
+              <p class="muted" data-i18n="game.crash.desc">Cash out before the rocket explodes.</p>
+            </div>
+            <div class="game-card" data-game="coinflip">
+              <div class="game-icon">🪙</div>
+              <h3 data-i18n="game.coinflip.name">Coinflip</h3>
+              <p class="muted" data-i18n="game.coinflip.desc">Heads or tails. Real 50/50 odds.</p>
+            </div>
+          </div>
+        </section>
+
+        <div id="gameArea" class="game-area hidden"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- AUTH MODAL -->
+  <div id="authModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <button id="modalClose" class="modal-close" aria-label="Close">&times;</button>
+
+      <div id="modalStep1">
+        <h2 data-i18n="modal.title">Link your Minecraft account</h2>
+        <p class="muted small" data-i18n="modal.subtitle">Enter your Minecraft username to generate a verification code.</p>
+        <input id="mcUsername" type="text" data-i18n-placeholder="modal.usernamePlaceholder" placeholder="Your Minecraft username" maxlength="16">
+        <button id="generateBtn" class="btn-primary" data-i18n="modal.generateBtn">Generate code</button>
         <p id="linkError" class="error hidden"></p>
       </div>
-    </section>
 
-    <!-- PANTALLA 2: JUEGOS -->
-    <section id="gamesScreen" class="screen hidden">
-      <div class="games-header">
-        <h1>Elige tu juego</h1>
-        <p class="muted">Bienvenido, <strong id="welcomeUser"></strong></p>
+      <div id="modalStep2" class="hidden">
+        <h2 data-i18n="modal.title">Link your Minecraft account</h2>
+        <p class="muted small" data-i18n="modal.instructions">Join the server and run this command exactly:</p>
+        <div class="code-box">
+          <span id="payCommand">/pay Donaciones ###</span>
+        </div>
+        <div class="spinner"></div>
+        <p class="muted small" data-i18n="modal.waiting">Waiting for confirmation, checking every 5 seconds...</p>
+        <button id="cancelLinkBtn" class="btn-secondary" data-i18n="modal.cancel">Cancel</button>
       </div>
 
-      <div class="games-grid">
-        <div class="game-card" data-game="mines">
-          <div class="game-icon">💣</div>
-          <h2>Mines</h2>
-          <p class="muted">Evita las minas y multiplica tu apuesta.</p>
-        </div>
-        <div class="game-card" data-game="crash">
-          <div class="game-icon">📈</div>
-          <h2>Crash</h2>
-          <p class="muted">Retira antes de que el cohete explote.</p>
-        </div>
-        <div class="game-card" data-game="coinflip">
-          <div class="game-icon">🪙</div>
-          <h2>Coinflip</h2>
-          <p class="muted">Cara o cruz real, 50/50. Pago x1.4.</p>
-        </div>
+      <div id="modalAlreadyLinked" class="hidden">
+        <h2 data-i18n="modal.alreadyTitle">You're already linked in</h2>
+        <p class="muted small" data-i18n="modal.alreadyBody">You can close this window and play right away.</p>
+        <button id="modalAlreadyCloseBtn" class="btn-primary" data-i18n="modal.close">Close</button>
       </div>
-
-      <div id="gameArea" class="game-area hidden"></div>
-    </section>
-
-  </main>
+    </div>
+  </div>
 
   <footer class="footer">
-    <p class="muted small">
-      Donut Clash utiliza una moneda virtual sin valor monetario real ("donuts").
-      Juega de forma responsable. Servicio no disponible para menores según las reglas del servidor.
+    <p class="muted small" data-i18n="footer.disclaimer">
+      Donut Clash uses a virtual currency ("donuts") with no real-world value. Play responsibly.
     </p>
   </footer>
 
+  <script src="i18n.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
