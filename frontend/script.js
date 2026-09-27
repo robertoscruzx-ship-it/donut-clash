@@ -3,7 +3,7 @@
 // ==============================
 // Cambia esto por la URL real de tu despliegue en Vercel, por ejemplo:
 // const API_BASE_URL = "https://donut-clash-api.vercel.app/api";
-const API_BASE_URL = "https://TU-PROYECTO.vercel.app/api";
+const API_BASE_URL = "https://donut-clash-rho.vercel.app/api";
 
 // ==============================
 // ESTADO GLOBAL
