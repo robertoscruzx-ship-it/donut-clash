@@ -12,9 +12,11 @@ const state = {
   clientSeed: null,
   balance: 0,
   pollingInterval: null,
-  activeMinesGameId: null,
-  activeCrashGameId: null,
-  crashAnimationFrame: null,
+  view: "home",
+  roundActive: false,
+  mines: null,
+  crash: null,
+  balanceLoop: null,
 };
 
 function getOrCreateClientSeed() {
@@ -46,7 +48,9 @@ const cancelLinkBtn = document.getElementById("cancelLinkBtn");
 const payCommand = document.getElementById("payCommand");
 const linkError = document.getElementById("linkError");
 
-const gameArea = document.getElementById("gameArea");
+const homeView = document.getElementById("homeView");
+const gameView = document.getElementById("gameView");
+const toastContainer = document.getElementById("toastContainer");
 
 // ==============================
 // IDIOMA
@@ -71,7 +75,7 @@ async function apiFetch(path, options = {}){
     ...options,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Network error");
+  if (!res.ok) { const e = new Error(data.error || "Network error"); e.status = res.status; e.data = data; throw e; }
   return data;
 }
 function updateBalanceDisplay(){
@@ -171,13 +175,14 @@ async function checkLinkStatus(){
           body: JSON.stringify({ minecraft_username: state.username }),
         });
         state.sessionToken = session.session_token;
+        try { localStorage.setItem("dc_session", JSON.stringify({ u: state.username, t: state.sessionToken })); } catch (e) {}
       } catch (err) {
         console.error("Could not claim session:", err.message);
       }
       state.balance = data.balance || 0;
       updateBalanceDisplay();
       closeModal();
-      setInterval(refreshBalance, 5000);
+      startBalanceLoop();
     }
   } catch (err) {
     // Silencioso: el usuario aún no ha completado el pago.
@@ -196,289 +201,281 @@ async function refreshBalance(){
 }
 
 // ==============================
-// ACCESO A LOS JUEGOS (bloqueado sin cuenta vinculada)
+// UTILIDADES DE JUEGO
 // ==============================
-document.querySelectorAll("[data-game]").forEach((el) => {
-  el.addEventListener("click", () => {
-    if (!state.sessionToken) {
-      openModal();
-      return;
-    }
-    openGame(el.dataset.game);
-  });
-});
+const $ = (id) => document.getElementById(id);
+const getBet = () => Math.floor(Number($("betAmount").value)) || 0;
+const say = (txt) => { $("gameMessage").textContent = txt; };
+const wonText = (m, p) => `${t("game.crash.wonPrefix")}${m.toFixed(2)}${t("game.crash.wonMiddle")}${p} ${t("donuts")}.`;
 
-function requireSession(){
-  if (!state.sessionToken) {
-    alert(t("error.needLink"));
-    return false;
+function startBalanceLoop(){
+  if (!state.balanceLoop) state.balanceLoop = setInterval(refreshBalance, 5000);
+}
+function setBalance(n){ state.balance = n; updateBalanceDisplay(); }
+
+function showToast(msg, { type = "info", actionKey, onAction } = {}){
+  const el = document.createElement("div");
+  el.className = `toast toast-${type}`;
+  const span = document.createElement("span");
+  span.textContent = msg;
+  el.appendChild(span);
+  if (actionKey) {
+    const b = document.createElement("button");
+    b.className = "toast-action";
+    b.textContent = t(actionKey);
+    b.onclick = () => { onAction(); el.remove(); };
+    el.appendChild(b);
   }
-  return true;
+  const x = document.createElement("button");
+  x.className = "toast-close";
+  x.textContent = "×";
+  x.onclick = () => el.remove();
+  el.appendChild(x);
+  toastContainer.appendChild(el);
+  setTimeout(() => el.remove(), 5000);
 }
 
-function openGame(game){
-  if (game === "mines") renderMines();
-  if (game === "crash") renderCrash();
-  if (game === "coinflip") renderCoinflip();
-  gameArea.classList.remove("hidden");
-  gameArea.scrollIntoView({ behavior: "smooth" });
+// Los invitados pueden ver todos los juegos, pero apostar exige sesión.
+function requireSession(){
+  if (state.sessionToken) return true;
+  showToast(t("toast.signInRequired"), { type: "error", actionKey: "nav.signIn", onAction: openModal });
+  return false;
+}
+function validBet(){
+  if (!requireSession()) return 0;
+  const bet = getBet();
+  if (bet < 1) showToast(t("error.invalidBet"), { type: "error" });
+  return bet;
+}
+const call = (path, body) => apiFetch(path, {
+  method: "POST",
+  body: JSON.stringify({ minecraft_username: state.username, session_token: state.sessionToken, ...body }),
+});
+const fail = (e) => showToast(e.message, { type: "error" });
+
+// ==============================
+// NAVEGACIÓN ENTRE INICIO Y JUEGOS
+// ==============================
+const GAMES = { mines: renderMines, crash: renderCrash, coinflip: renderCoinflip };
+
+function navigate(name){
+  if (name === state.view) return;
+  if (state.roundActive) { showToast(t("toast.finishRound"), { type: "error" }); return; }
+  state.view = name;
+  document.querySelectorAll(".sidebar-item").forEach((b) => b.classList.toggle("active", (b.dataset.game || b.dataset.view) === name));
+  homeView.classList.toggle("hidden", name !== "home");
+  gameView.classList.toggle("hidden", name === "home");
+  if (name !== "home") { GAMES[name](); applyTranslations(); }
+}
+document.querySelectorAll("[data-game], [data-view]").forEach((el) =>
+  el.addEventListener("click", () => navigate(el.dataset.game || el.dataset.view)));
+$("logoLink").addEventListener("click", () => navigate("home"));
+
+// ==============================
+// LAYOUT: escenario del juego + panel lateral de apuesta
+// ==============================
+function layout(stageHTML, extraHTML, actionKey){
+  gameView.innerHTML = `
+    <div class="game-layout">
+      <div class="game-stage">${stageHTML}</div>
+      <aside class="bet-panel">
+        <div class="bet-tabs">
+          <button class="bet-tab active" data-i18n="bet.manual">Manual</button>
+          <button class="bet-tab" disabled data-i18n="bet.auto">Auto</button>
+        </div>
+        <label class="bet-label" data-i18n="bet.amount">Bet Amount</label>
+        <div class="bet-row">
+          <input type="number" id="betAmount" min="1" value="10">
+          <button class="chip" id="betHalf">½</button>
+          <button class="chip" id="betDouble">2x</button>
+          <button class="chip" id="betMax" data-i18n="bet.max">Max</button>
+        </div>
+        ${extraHTML}
+        <button id="actionBtn" class="btn-primary btn-lg" data-i18n="${actionKey}"></button>
+        <p id="gameMessage" class="muted small"></p>
+      </aside>
+    </div>`;
+  $("betHalf").onclick = () => { $("betAmount").value = Math.max(1, Math.floor(getBet() / 2)); };
+  $("betDouble").onclick = () => { $("betAmount").value = Math.max(1, getBet() * 2); };
+  $("betMax").onclick = () => { $("betAmount").value = Math.max(1, Math.floor(state.balance)); };
+}
+function lockPanel(locked){
+  state.roundActive = locked;
+  gameView.querySelectorAll(".bet-panel input, .bet-panel .chip").forEach((e) => { e.disabled = locked; });
+}
+function setAction(key){
+  const b = $("actionBtn");
+  b.setAttribute("data-i18n", key);
+  b.textContent = t(key);
 }
 
 // ---------- COINFLIP ----------
 function renderCoinflip(){
-  gameArea.innerHTML = `
-    <h2>🪙 ${t("game.coinflip.name")}</h2>
-    <p class="muted small">${t("game.coinflip.info")}</p>
-    <input type="number" class="bet-input" id="coinBet" min="1" value="10">
-    <div>
-      <button class="btn-secondary" id="pickHeads">${t("game.coinflip.heads")}</button>
-      <button class="btn-secondary" id="pickTails">${t("game.coinflip.tails")}</button>
-    </div>
-    <div class="coin" id="coinDisplay">🪙</div>
-    <p id="coinResult" class="muted small"></p>
-  `;
-
-  const flip = async (choice) => {
-    if (!requireSession()) return;
-    const bet = Number(document.getElementById("coinBet").value) || 0;
-    document.getElementById("coinResult").textContent = "...";
+  layout(
+    `<div class="stage-title">🪙 <span data-i18n="game.coinflip.name">Coinflip</span></div><div class="coin" id="coin">🪙</div>`,
+    `<label class="bet-label" data-i18n="game.coinflip.pick">Pick a side</label>
+     <div class="bet-row">
+       <button class="chip side active" data-side="heads" data-i18n="game.coinflip.heads">Heads</button>
+       <button class="chip side" data-side="tails" data-i18n="game.coinflip.tails">Tails</button>
+     </div>`, "bet.placeBet");
+  const sides = gameView.querySelectorAll(".side");
+  sides.forEach((b) => { b.onclick = () => { sides.forEach((x) => x.classList.remove("active")); b.classList.add("active"); }; });
+  $("actionBtn").onclick = async () => {
+    const bet = validBet();
+    if (bet < 1) return;
+    const choice = gameView.querySelector(".side.active").dataset.side;
+    $("actionBtn").disabled = true;
     try {
-      const data = await apiFetch("/bet/coinflip", {
-        method: "POST",
-        body: JSON.stringify({
-          minecraft_username: state.username,
-          session_token: state.sessionToken,
-          bet_amount: bet,
-          choice,
-          client_seed: getOrCreateClientSeed(),
-        }),
-      });
-      document.getElementById("coinDisplay").textContent = data.result === "heads" ? "😀" : "🌑";
-      document.getElementById("coinResult").textContent = data.won
-        ? `${t("game.coinflip.won")}${data.payout} ${t("donuts")}.`
-        : `${t("game.coinflip.lost")}${bet} ${t("donuts")}.`;
-      state.balance = data.balance;
-      updateBalanceDisplay();
-    } catch (err) {
-      document.getElementById("coinResult").textContent = t("error.genericPrefix") + err.message;
-    }
+      const d = await call("/bet/coinflip", { bet_amount: bet, choice, client_seed: getOrCreateClientSeed() });
+      $("coin").textContent = d.result === "heads" ? "😀" : "🌑";
+      say(d.won ? `${t("game.coinflip.won")}${d.payout} ${t("donuts")}.` : `${t("game.coinflip.lost")}${bet} ${t("donuts")}.`);
+      setBalance(d.balance);
+    } catch (e) { fail(e); }
+    $("actionBtn").disabled = false;
   };
-
-  document.getElementById("pickHeads").addEventListener("click", () => flip("heads"));
-  document.getElementById("pickTails").addEventListener("click", () => flip("tails"));
 }
 
 // ---------- MINES ----------
 function renderMines(){
-  gameArea.innerHTML = `
-    <h2>💣 ${t("game.mines.name")}</h2>
-    <input type="number" class="bet-input" id="minesBet" min="1" value="10">
-    <input type="number" class="bet-input" id="minesBombs" min="1" max="24" value="3" title="${t('game.mines.bombsLabel')}">
-    <button class="btn-primary" id="minesStartBtn">${t("game.common.start")}</button>
-    <div class="mines-grid hidden" id="minesGrid"></div>
-    <button class="btn-secondary hidden" id="minesCashoutBtn">${t("game.common.cashout")}</button>
-    <p id="minesResult" class="muted small"></p>
-  `;
-  document.getElementById("minesStartBtn").addEventListener("click", startMinesGame);
-}
-
-async function startMinesGame(){
-  if (!requireSession()) return;
-  const bet = Number(document.getElementById("minesBet").value) || 0;
-  const bombs = Number(document.getElementById("minesBombs").value) || 0;
-  const resultEl = document.getElementById("minesResult");
-
-  try {
-    const data = await apiFetch("/mines/start", {
-      method: "POST",
-      body: JSON.stringify({
-        minecraft_username: state.username,
-        session_token: state.sessionToken,
-        bet_amount: bet,
-        bombs_count: bombs,
-        client_seed: getOrCreateClientSeed(),
-      }),
-    });
-
-    state.activeMinesGameId = data.game_id;
-    document.getElementById("minesStartBtn").classList.add("hidden");
-    document.getElementById("minesBet").disabled = true;
-    document.getElementById("minesBombs").disabled = true;
-    resultEl.textContent = "";
-
-    const grid = document.getElementById("minesGrid");
-    grid.classList.remove("hidden");
-    grid.innerHTML = "";
-
-    for (let i = 0; i < data.board_size; i++){
-      const tile = document.createElement("div");
-      tile.className = "mine-tile";
-      tile.textContent = "?";
-      tile.addEventListener("click", () => revealMinesTile(i, tile));
-      grid.appendChild(tile);
-    }
-
-    const cashoutBtn = document.getElementById("minesCashoutBtn");
-    cashoutBtn.classList.remove("hidden");
-    cashoutBtn.onclick = cashoutMines;
-  } catch (err) {
-    resultEl.textContent = t("error.genericPrefix") + err.message;
+  layout(
+    `<div class="stage-title">💣 <span data-i18n="game.mines.name">Mines</span></div><div class="mines-grid" id="minesGrid"></div>`,
+    `<label class="bet-label" data-i18n="game.mines.bombs">Bombs</label>
+     <input type="number" id="bombs" min="1" max="24" value="3">`, "bet.placeBet");
+  const grid = $("minesGrid");
+  for (let i = 0; i < 25; i++){
+    const tile = document.createElement("div");
+    tile.className = "mine-tile";
+    tile.textContent = "?";
+    tile.onclick = () => revealTile(i, tile);
+    grid.appendChild(tile);
   }
+  $("actionBtn").onclick = () => (state.mines ? minesCashout() : minesStart());
 }
 
-async function revealMinesTile(tileIndex, tileEl){
-  if (!state.activeMinesGameId) return;
-  const resultEl = document.getElementById("minesResult");
-
+async function minesStart(){
+  const bet = validBet();
+  if (bet < 1) return;
   try {
-    const data = await apiFetch("/mines/reveal", {
-      method: "POST",
-      body: JSON.stringify({
-        minecraft_username: state.username,
-        session_token: state.sessionToken,
-        game_id: state.activeMinesGameId,
-        tile_index: tileIndex,
-      }),
-    });
+    const d = await call("/mines/start", { bet_amount: bet, bombs_count: Number($("bombs").value) || 0, client_seed: getOrCreateClientSeed() });
+    state.mines = { id: d.game_id };
+    gameView.querySelectorAll(".mine-tile").forEach((x) => { x.className = "mine-tile"; x.textContent = "?"; });
+    lockPanel(true);
+    setAction("bet.cashOut");
+    say("");
+    refreshBalance();
+  } catch (e) { fail(e); }
+}
 
-    if (data.result === "bomb"){
-      tileEl.classList.add("revealed-bomb");
-      tileEl.textContent = "💣";
-      resultEl.textContent = t("game.mines.boom");
-      finishMinesUI(data.bomb_positions);
+async function revealTile(i, tile){
+  if (!state.mines) { requireSession(); return; }
+  if (tile.dataset.busy || tile.classList.contains("revealed-safe")) return;
+  tile.dataset.busy = 1;
+  try {
+    const d = await call("/mines/reveal", { game_id: state.mines.id, tile_index: i });
+    if (d.result === "bomb"){
+      tile.classList.add("revealed-bomb");
+      tile.textContent = "💣";
+      say(t("game.mines.boom"));
+      endMines(d.bomb_positions);
     } else {
-      tileEl.classList.add("revealed-safe");
-      tileEl.textContent = "💎";
-      resultEl.textContent = `${t("game.mines.multiplierPrefix")}${data.current_multiplier.toFixed(2)}x`;
-      if (data.board_fully_cleared) {
-        resultEl.textContent += t("game.mines.boardCleared");
-      }
+      tile.classList.add("revealed-safe");
+      tile.textContent = "💎";
+      say(`${t("game.mines.multiplierPrefix")}${d.current_multiplier.toFixed(2)}x` + (d.board_fully_cleared ? t("game.mines.boardCleared") : ""));
     }
-  } catch (err) {
-    resultEl.textContent = t("error.genericPrefix") + err.message;
-  }
+  } catch (e) { fail(e); }
+  delete tile.dataset.busy;
 }
 
-async function cashoutMines(){
-  if (!state.activeMinesGameId) return;
-  const resultEl = document.getElementById("minesResult");
-
+async function minesCashout(){
   try {
-    const data = await apiFetch("/mines/cashout", {
-      method: "POST",
-      body: JSON.stringify({
-        minecraft_username: state.username,
-        session_token: state.sessionToken,
-        game_id: state.activeMinesGameId,
-      }),
-    });
-    resultEl.textContent = `${t("game.crash.wonPrefix")}${data.multiplier.toFixed(2)}x. ${t("game.crash.wonMiddle")}${data.payout} ${t("donuts")}.`;
-    state.balance = data.balance;
-    updateBalanceDisplay();
-    finishMinesUI(data.bomb_positions);
-  } catch (err) {
-    resultEl.textContent = t("error.genericPrefix") + err.message;
-  }
+    const d = await call("/mines/cashout", { game_id: state.mines.id });
+    say(wonText(d.multiplier, d.payout));
+    setBalance(d.balance);
+    endMines(d.bomb_positions);
+  } catch (e) { fail(e); }
 }
 
-function finishMinesUI(bombPositions){
-  state.activeMinesGameId = null;
-  document.getElementById("minesCashoutBtn").classList.add("hidden");
-  document.getElementById("minesStartBtn").classList.remove("hidden");
-  document.getElementById("minesBet").disabled = false;
-  document.getElementById("minesBombs").disabled = false;
-
-  if (bombPositions) {
-    const tiles = document.querySelectorAll("#minesGrid .mine-tile");
-    bombPositions.forEach((idx) => {
-      if (!tiles[idx].classList.contains("revealed-safe") && !tiles[idx].classList.contains("revealed-bomb")) {
-        tiles[idx].classList.add("revealed-bomb");
-        tiles[idx].textContent = "💣";
-      }
-    });
-  }
+function endMines(bombs){
+  state.mines = null;
+  lockPanel(false);
+  setAction("bet.placeBet");
+  const tiles = gameView.querySelectorAll(".mine-tile");
+  (bombs || []).forEach((i) => {
+    if (!tiles[i].classList.contains("revealed-bomb")) { tiles[i].classList.add("revealed-bomb"); tiles[i].textContent = "💣"; }
+  });
 }
 
 // ---------- CRASH ----------
 function renderCrash(){
-  gameArea.innerHTML = `
-    <h2>📈 ${t("game.crash.name")}</h2>
-    <p class="muted small">${t("game.crash.info")}</p>
-    <input type="number" class="bet-input" id="crashBet" min="1" value="10">
-    <div class="crash-display" id="crashMultiplier">1.00x</div>
-    <button class="btn-primary" id="crashStart">${t("game.common.bet")}</button>
-    <button class="btn-secondary hidden" id="crashCashout">${t("game.common.cashout")}</button>
-    <p id="crashResult" class="muted small"></p>
-  `;
-  document.getElementById("crashStart").addEventListener("click", startCrashGame);
+  layout(
+    `<div class="stage-title">📈 <span data-i18n="game.crash.name">Crash</span></div>
+     <div class="crash-center"><div class="crash-display" id="crashMult">1.00x</div><div class="muted" data-i18n="game.crash.currentPayout">CURRENT PAYOUT</div></div>`,
+    `<label class="bet-label" data-i18n="bet.autoCashout">Auto Cashout</label>
+     <div class="bet-row">
+       <input type="number" id="autoAt" min="1.01" step="0.01" placeholder="—">
+       <button class="chip" data-at="2">2x</button><button class="chip" data-at="10">10x</button>
+     </div>`, "bet.placeBet");
+  gameView.querySelectorAll("[data-at]").forEach((b) => { b.onclick = () => { $("autoAt").value = b.dataset.at; }; });
+  $("actionBtn").onclick = () => (state.crash ? crashCash() : crashStart());
 }
 
-async function startCrashGame(){
-  if (!requireSession()) return;
-  const bet = Number(document.getElementById("crashBet").value) || 0;
-  const resultEl = document.getElementById("crashResult");
-  const startBtn = document.getElementById("crashStart");
-  const cashoutBtn = document.getElementById("crashCashout");
-
+async function crashStart(){
+  const bet = validBet();
+  if (bet < 1) return;
   try {
-    const data = await apiFetch("/crash/start", {
-      method: "POST",
-      body: JSON.stringify({
-        minecraft_username: state.username,
-        session_token: state.sessionToken,
-        bet_amount: bet,
-        client_seed: getOrCreateClientSeed(),
-      }),
-    });
-
-    state.activeCrashGameId = data.game_id;
-    startBtn.classList.add("hidden");
-    cashoutBtn.classList.remove("hidden");
-    resultEl.textContent = "";
-
-    const tick = () => {
-      const elapsedSeconds = (Date.now() - data.start_time) / 1000;
-      const multiplier = Math.exp(data.growth_rate * elapsedSeconds);
-      document.getElementById("crashMultiplier").textContent = multiplier.toFixed(2) + "x";
-      state.crashAnimationFrame = requestAnimationFrame(tick);
-    };
-    tick();
-
-    cashoutBtn.onclick = () => cashoutCrash(startBtn, cashoutBtn);
-  } catch (err) {
-    resultEl.textContent = t("error.genericPrefix") + err.message;
-  }
+    const d = await call("/crash/start", { bet_amount: bet, client_seed: getOrCreateClientSeed() });
+    state.crash = { id: d.game_id, t0: Date.now(), rate: d.growth_rate, auto: parseFloat($("autoAt").value) || 0 };
+    lockPanel(true);
+    setAction("bet.cashOut");
+    say("");
+    refreshBalance();
+    crashTick();
+  } catch (e) { fail(e); }
 }
 
-async function cashoutCrash(startBtn, cashoutBtn){
-  if (!state.activeCrashGameId) return;
-  const resultEl = document.getElementById("crashResult");
-  cancelAnimationFrame(state.crashAnimationFrame);
+function crashTick(){
+  const c = state.crash;
+  if (!c) return;
+  const m = Math.exp(c.rate * (Date.now() - c.t0) / 1000);
+  $("crashMult").textContent = m.toFixed(2) + "x";
+  if (c.auto && m >= c.auto) { crashCash(); return; }
+  c.raf = requestAnimationFrame(crashTick);
+}
 
+async function crashCash(){
+  const c = state.crash;
+  if (!c || c.busy) return;
+  c.busy = true;
+  cancelAnimationFrame(c.raf);
   try {
-    const data = await apiFetch("/crash/cashout", {
-      method: "POST",
-      body: JSON.stringify({
-        minecraft_username: state.username,
-        session_token: state.sessionToken,
-        game_id: state.activeCrashGameId,
-      }),
-    });
-
-    if (data.result === "crashed"){
-      document.getElementById("crashMultiplier").textContent = data.crash_point.toFixed(2) + "x";
-      resultEl.textContent = t("game.crash.crashed");
+    const d = await call("/crash/cashout", { game_id: c.id });
+    if (d.result === "crashed"){
+      $("crashMult").textContent = d.crash_point.toFixed(2) + "x";
+      say(t("game.crash.crashed"));
     } else {
-      document.getElementById("crashMultiplier").textContent = data.multiplier.toFixed(2) + "x";
-      resultEl.textContent = `${t("game.crash.wonPrefix")}${data.multiplier.toFixed(2)}x. ${t("game.crash.wonMiddle")}${data.payout} ${t("donuts")}.`;
-      state.balance = data.balance;
-      updateBalanceDisplay();
+      $("crashMult").textContent = d.multiplier.toFixed(2) + "x";
+      say(wonText(d.multiplier, d.payout));
+      setBalance(d.balance);
     }
-  } catch (err) {
-    resultEl.textContent = t("error.genericPrefix") + err.message;
-  } finally {
-    state.activeCrashGameId = null;
-    cashoutBtn.classList.add("hidden");
-    startBtn.classList.remove("hidden");
+    state.crash = null;
+    lockPanel(false);
+    setAction("bet.placeBet");
+  } catch (e) {
+    c.busy = false;
+    fail(e);
+    c.raf = requestAnimationFrame(crashTick);
   }
 }
+
+// ==============================
+// RESTAURAR SESIÓN GUARDADA
+// ==============================
+try {
+  const saved = JSON.parse(localStorage.getItem("dc_session") || "null");
+  if (saved && saved.u && saved.t) {
+    state.username = saved.u;
+    state.sessionToken = saved.t;
+    refreshBalance();
+    startBalanceLoop();
+  }
+} catch (e) {}

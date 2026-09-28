@@ -12,7 +12,7 @@
 
     <!-- TOPBAR -->
     <header class="topbar">
-      <div class="logo">🍩 <span>Donut</span><span class="accent">Clash</span></div>
+      <div class="logo" id="logoLink" style="cursor:pointer">🍩 <span>Donut</span><span class="accent">Clash</span></div>
 
       <div class="topbar-right">
         <div class="balance-pill">
@@ -34,6 +34,7 @@
 
       <!-- SIDEBAR -->
       <aside class="sidebar">
+        <nav class="sidebar-nav" style="margin-bottom:14px"><button class="sidebar-item active" data-view="home"><span class="icon">🏠</span><span data-i18n="nav.home">Home</span></button></nav>
         <div class="sidebar-title" data-i18n="sidebar.games">GAMES</div>
         <nav class="sidebar-nav">
           <button class="sidebar-item" data-game="mines">
@@ -53,6 +54,7 @@
 
       <!-- MAIN CONTENT -->
       <main class="main-content">
+        <div id="homeView">
 
         <section class="hero">
           <h1><span class="hero-brand">DONUT CLASH</span> <span class="hero-accent" data-i18n="hero.title2">CASINO</span></h1>
@@ -88,7 +90,8 @@
           </div>
         </section>
 
-        <div id="gameArea" class="game-area hidden"></div>
+        </div>
+        <div id="gameView" class="hidden"></div>
       </main>
     </div>
   </div>
@@ -124,6 +127,8 @@
       </div>
     </div>
   </div>
+
+  <div id="toastContainer" class="toast-container"></div>
 
   <footer class="footer">
     <p class="muted small" data-i18n="footer.disclaimer">
