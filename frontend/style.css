@@ -324,3 +324,24 @@ body{
 .toast-action{background:var(--accent); color:#fff; border:none; border-radius:6px; padding:4px 10px; font-weight:700; cursor:pointer; white-space:nowrap;}
 .toast-close{background:none; border:none; color:var(--muted); font-size:1.1rem; cursor:pointer;}
 @media (max-width:900px){.game-layout{grid-template-columns:1fr;}}
+
+/* ===== SEARCH BAR ===== */
+.search-row{position:relative; margin-bottom:20px;}
+.search-input{
+  width:100%; padding:12px 40px 12px 14px;
+  background:var(--panel); border:1px solid var(--border); border-radius:10px;
+  color:var(--text); font-size:1rem;
+}
+.search-input:focus{outline:none; border-color:var(--accent);}
+.search-clear{
+  position:absolute; right:10px; top:50%; transform:translateY(-50%);
+  background:none; border:none; color:var(--muted); font-size:1.3rem; cursor:pointer; line-height:1;
+}
+.search-clear:hover{color:var(--text);}
+.game-card.dimmed{opacity:0.35;}
+
+/* ===== ADMIN STATS (oculto) ===== */
+.admin-table{width:100%; border-collapse:collapse; margin:16px 0;}
+.admin-table th, .admin-table td{padding:8px 10px; text-align:left; border-bottom:1px solid var(--border); font-size:0.9rem;}
+.admin-table thead th{color:var(--muted); font-weight:700; text-transform:uppercase; font-size:0.7rem;}
+.admin-table tfoot td{font-weight:700; border-top:2px solid var(--border); border-bottom:none;}

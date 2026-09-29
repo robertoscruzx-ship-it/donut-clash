@@ -69,6 +69,11 @@
           <button class="btn-secondary" disabled data-i18n="banner.button">Coming soon</button>
         </section>
 
+        <div class="search-row">
+          <input id="gameSearch" type="text" class="search-input" data-i18n-placeholder="search.placeholder" placeholder="Search games...">
+          <button id="searchClear" class="search-clear hidden" aria-label="Clear">&times;</button>
+        </div>
+
         <section class="featured">
           <h2 data-i18n="featured.title">Featured Games</h2>
           <div class="games-grid">
@@ -92,6 +97,7 @@
 
         </div>
         <div id="gameView" class="hidden"></div>
+        <div id="adminStatsView" class="hidden"></div>
       </main>
     </div>
   </div>

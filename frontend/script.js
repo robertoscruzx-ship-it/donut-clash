@@ -479,3 +479,100 @@ try {
     startBalanceLoop();
   }
 } catch (e) {}
+
+// ==============================
+// BÚSQUEDA DE JUEGOS + DESBLOQUEO OCULTO DE ESTADÍSTICAS
+// ==============================
+const gameSearch = document.getElementById("gameSearch");
+const searchClear = document.getElementById("searchClear");
+const adminStatsView = document.getElementById("adminStatsView");
+const gamesGrid = document.querySelector(".games-grid");
+let adminCheckTimer = null;
+
+function matchScore(query, card){
+  const name = card.querySelector("h3").textContent.toLowerCase();
+  const desc = card.querySelector("p").textContent.toLowerCase();
+  if (name === query) return 3;
+  if (name.startsWith(query)) return 2;
+  if (name.includes(query) || desc.includes(query)) return 1;
+  return 0;
+}
+
+function runGameSearch(raw){
+  const query = raw.trim().toLowerCase();
+  searchClear.classList.toggle("hidden", !raw);
+  const cards = Array.from(gamesGrid.querySelectorAll(".game-card"));
+  if (!query){
+    cards.forEach((c) => { c.style.order = ""; c.classList.remove("dimmed"); });
+    return;
+  }
+  cards
+    .map((c) => ({ c, score: matchScore(query, c) }))
+    .sort((a, b) => b.score - a.score)
+    .forEach(({ c, score }, i) => {
+      c.style.order = i;
+      c.classList.toggle("dimmed", score === 0);
+    });
+}
+
+gameSearch.addEventListener("input", () => {
+  const raw = gameSearch.value;
+  runGameSearch(raw);
+  hideAdminStats();
+
+  clearTimeout(adminCheckTimer);
+  adminCheckTimer = setTimeout(() => tryAdminUnlock(raw.trim()), 400);
+});
+
+searchClear.addEventListener("click", () => {
+  gameSearch.value = "";
+  runGameSearch("");
+  hideAdminStats();
+  gameSearch.focus();
+});
+
+async function tryAdminUnlock(candidateKey){
+  if (!candidateKey || candidateKey.length < 20) return; // muy corto para ser la API_KEY, no molestamos al backend
+  try {
+    const stats = await apiFetch("/admin/stats", {
+      method: "POST",
+      body: JSON.stringify({ api_key: candidateKey }),
+    });
+    renderAdminStats(stats);
+  } catch (e) {
+    // clave incorrecta: no pasa nada, se queda como búsqueda normal.
+  }
+}
+
+function hideAdminStats(){
+  adminStatsView.classList.add("hidden");
+  adminStatsView.innerHTML = "";
+  gamesGrid.parentElement.classList.remove("hidden");
+}
+
+function renderAdminStats(stats){
+  gamesGrid.parentElement.classList.add("hidden");
+  const rows = stats.per_game.map((g) => `
+    <tr>
+      <td>${g._id}</td><td>${g.total_bets}</td><td>${g.total_wagered}</td><td>${g.total_paid_out}</td>
+      <td>${g.wins}</td><td>${g.losses}</td><td>${g.forced_losses}</td>
+    </tr>`).join("");
+  const t2 = stats.totals;
+  adminStatsView.innerHTML = `
+    <h2>${t("admin.title")}</h2>
+    <p class="muted small">${t("admin.reserve")}: <strong>${Math.floor(stats.house_reserve)}</strong> ${t("donuts")}</p>
+    <table class="admin-table">
+      <thead><tr>
+        <th>${t("admin.game")}</th><th>${t("admin.bets")}</th><th>${t("admin.wagered")}</th><th>${t("admin.paid")}</th>
+        <th>${t("admin.wins")}</th><th>${t("admin.losses")}</th><th>${t("admin.forced")}</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td>${t("admin.totals")}</td><td>${t2.total_bets}</td><td>${t2.total_wagered}</td><td>${t2.total_paid_out}</td>
+        <td>${t2.wins}</td><td>${t2.losses}</td><td>${t2.forced_losses}</td>
+      </tr></tfoot>
+    </table>
+    <p class="muted small">${t("admin.edge")}: <strong>${(t2.observed_house_edge * 100).toFixed(1)}%</strong></p>
+  `;
+  adminStatsView.classList.remove("hidden");
+}
