@@ -2,7 +2,7 @@ const express = require("express");
 const { getBetsCollection } = require("../../lib/db");
 const { getHouseReserve } = require("../../lib/house");
 const { cors } = require("../../lib/cors");
-const { requireApiKey } = require("../../lib/auth");
+const { requireAdminPanelAuth } = require("../../lib/auth");
 
 const app = express();
 app.use(express.json());
@@ -10,15 +10,15 @@ app.use(cors);
 
 /**
  * POST /api/admin/stats
- * Body: { api_key }
+ * Body: { admin_password }
  *
  * Endpoint oculto (no está enlazado desde el frontend ni documentado ahí).
- * Solo accesible con tu API_KEY, pensado para el presentador: llama a esto
- * al final de la demostración para mostrar los números reales de la
- * sesión (total apostado, pagado, margen real, cuántas fueron pérdida
- * forzada, etc.).
+ * Protegido por ADMIN_PANEL_PASSWORD (distinta de la API_KEY real), pensado
+ * para el presentador: llama a esto al final de la demostración para
+ * mostrar los números reales de la sesión (total apostado, pagado, margen
+ * real, cuántas fueron pérdida forzada, etc.).
  */
-app.post("/", requireApiKey, async (req, res) => {
+app.post("/", requireAdminPanelAuth, async (req, res) => {
   try {
     const bets = await getBetsCollection();
 

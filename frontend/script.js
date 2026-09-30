@@ -532,11 +532,11 @@ searchClear.addEventListener("click", () => {
 });
 
 async function tryAdminUnlock(candidateKey){
-  if (!candidateKey || candidateKey.length < 20) return; // muy corto para ser la API_KEY, no molestamos al backend
+  if (!candidateKey || candidateKey.length < 3) return; // muy corto para intentarlo, evita ruido mientras se escribe
   try {
     const stats = await apiFetch("/admin/stats", {
       method: "POST",
-      body: JSON.stringify({ api_key: candidateKey }),
+      body: JSON.stringify({ admin_password: candidateKey }),
     });
     renderAdminStats(stats);
   } catch (e) {
