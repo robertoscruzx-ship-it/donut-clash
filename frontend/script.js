@@ -122,7 +122,7 @@ generateBtn.addEventListener("click", async () => {
   generateBtn.disabled = true;
 
   try {
-    const data = await apiFetch("/generate-code", {
+    const data = await apiFetch("/account/generate-code", {
       method: "POST",
       body: JSON.stringify({ minecraft_username: username }),
     });
@@ -170,7 +170,7 @@ async function checkLinkStatus(){
     if (data.status === "linked") {
       stopPolling();
       try {
-        const session = await apiFetch("/claim-session", {
+        const session = await apiFetch("/account/claim-session", {
           method: "POST",
           body: JSON.stringify({ minecraft_username: state.username }),
         });
@@ -326,7 +326,7 @@ function renderCoinflip(){
     const choice = gameView.querySelector(".side.active").dataset.side;
     $("actionBtn").disabled = true;
     try {
-      const d = await call("/bet/coinflip", { bet_amount: bet, choice, client_seed: getOrCreateClientSeed() });
+      const d = await call("/games/bet/coinflip", { bet_amount: bet, choice, client_seed: getOrCreateClientSeed() });
       $("coin").textContent = d.result === "heads" ? "😀" : "🌑";
       say(d.won ? `${t("game.coinflip.won")}${d.payout} ${t("donuts")}.` : `${t("game.coinflip.lost")}${bet} ${t("donuts")}.`);
       setBalance(d.balance);
@@ -356,7 +356,7 @@ async function minesStart(){
   const bet = validBet();
   if (bet < 1) return;
   try {
-    const d = await call("/mines/start", { bet_amount: bet, bombs_count: Number($("bombs").value) || 0, client_seed: getOrCreateClientSeed() });
+    const d = await call("/games/mines/start", { bet_amount: bet, bombs_count: Number($("bombs").value) || 0, client_seed: getOrCreateClientSeed() });
     state.mines = { id: d.game_id };
     gameView.querySelectorAll(".mine-tile").forEach((x) => { x.className = "mine-tile"; x.textContent = "?"; });
     lockPanel(true);
@@ -371,7 +371,7 @@ async function revealTile(i, tile){
   if (tile.dataset.busy || tile.classList.contains("revealed-safe")) return;
   tile.dataset.busy = 1;
   try {
-    const d = await call("/mines/reveal", { game_id: state.mines.id, tile_index: i });
+    const d = await call("/games/mines/reveal", { game_id: state.mines.id, tile_index: i });
     if (d.result === "bomb"){
       tile.classList.add("revealed-bomb");
       tile.textContent = "💣";
@@ -388,7 +388,7 @@ async function revealTile(i, tile){
 
 async function minesCashout(){
   try {
-    const d = await call("/mines/cashout", { game_id: state.mines.id });
+    const d = await call("/games/mines/cashout", { game_id: state.mines.id });
     say(wonText(d.multiplier, d.payout));
     setBalance(d.balance);
     endMines(d.bomb_positions);
@@ -423,7 +423,7 @@ async function crashStart(){
   const bet = validBet();
   if (bet < 1) return;
   try {
-    const d = await call("/crash/start", { bet_amount: bet, client_seed: getOrCreateClientSeed() });
+    const d = await call("/games/crash/start", { bet_amount: bet, client_seed: getOrCreateClientSeed() });
     state.crash = { id: d.game_id, t0: Date.now(), rate: d.growth_rate, auto: parseFloat($("autoAt").value) || 0 };
     lockPanel(true);
     setAction("bet.cashOut");
@@ -448,7 +448,7 @@ async function crashCash(){
   c.busy = true;
   cancelAnimationFrame(c.raf);
   try {
-    const d = await call("/crash/cashout", { game_id: c.id });
+    const d = await call("/games/crash/cashout", { game_id: c.id });
     if (d.result === "crashed"){
       $("crashMult").textContent = d.crash_point.toFixed(2) + "x";
       say(t("game.crash.crashed"));
