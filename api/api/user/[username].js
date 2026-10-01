@@ -11,10 +11,14 @@ app.use(cors);
  * Devuelve los datos públicos de un usuario: saldo y estado.
  * (No expone pending_code ni ningún dato sensible.)
  */
-app.get("/", async (req, res) => {
+app.get("*", async (req, res) => {
   try {
-    // Vercel inyecta el parámetro dinámico [username] en req.query.username
-    const username = String(req.query.username || "").trim();
+    // Según cómo Vercel reenvíe la petición, el username puede venir en
+    // req.query.username (convención clásica de rutas dinámicas) o como
+    // el último segmento de la ruta completa (ej. "/api/user/steve").
+    const pathSegments = req.path.split("/").filter(Boolean);
+    const pathUsername = pathSegments[pathSegments.length - 1] || "";
+    const username = String(req.query.username || pathUsername || "").trim();
 
     if (!username) {
       return res.status(400).json({ error: "username es requerido." });
