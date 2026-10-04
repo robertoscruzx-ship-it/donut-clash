@@ -80,9 +80,14 @@ const navAvatarImg = document.getElementById("navAvatarImg");
 const langSelect = document.getElementById("langSelect");
 
 const walletBtn = document.getElementById("walletBtn");
-const walletMenu = document.getElementById("walletMenu");
-const walletDepositBtn = document.getElementById("walletDepositBtn");
-const walletWithdrawBtn = document.getElementById("walletWithdrawBtn");
+const walletView = document.getElementById("walletView");
+const walletAccountAvatar = document.getElementById("walletAccountAvatar");
+const walletAccountUsername = document.getElementById("walletAccountUsername");
+const walletBalanceValue = document.getElementById("walletBalanceValue");
+const walletTabDeposit = document.getElementById("walletTabDeposit");
+const walletTabWithdraw = document.getElementById("walletTabWithdraw");
+const walletPanelDeposit = document.getElementById("walletPanelDeposit");
+const walletPanelWithdraw = document.getElementById("walletPanelWithdraw");
 
 const authModal = document.getElementById("authModal");
 const modalClose = document.getElementById("modalClose");
@@ -104,8 +109,6 @@ const skinPreview = document.getElementById("skinPreview");
 const skinPreviewImg = document.getElementById("skinPreviewImg");
 const skinPreviewName = document.getElementById("skinPreviewName");
 
-const depositModal = document.getElementById("depositModal");
-const depositModalClose = document.getElementById("depositModalClose");
 const depositFromAvatar = document.getElementById("depositFromAvatar");
 const depositFromName = document.getElementById("depositFromName");
 const depositBotAvatar = document.getElementById("depositBotAvatar");
@@ -115,8 +118,6 @@ const depositContinueBtn = document.getElementById("depositContinueBtn");
 const depositCommandBox = document.getElementById("depositCommandBox");
 const depositPayCommand = document.getElementById("depositPayCommand");
 
-const withdrawModal = document.getElementById("withdrawModal");
-const withdrawModalClose = document.getElementById("withdrawModalClose");
 const withdrawBotAvatar = document.getElementById("withdrawBotAvatar");
 const withdrawBotName = document.getElementById("withdrawBotName");
 const withdrawToAvatar = document.getElementById("withdrawToAvatar");
@@ -160,6 +161,7 @@ async function apiFetch(path, options = {}){
 function updateBalanceDisplay(){
   balanceValue.textContent = state.balance;
   if (accountBalanceValue) accountBalanceValue.textContent = state.balance;
+  if (walletBalanceValue) walletBalanceValue.textContent = state.balance;
 }
 
 // Cambia Sign In / Register por la cabeza de Minecraft del jugador
@@ -170,7 +172,7 @@ function updateAuthUI(){
   registerBtn.classList.toggle("hidden", linked);
   navAvatarBtn.classList.toggle("hidden", !linked);
   walletBtn.classList.toggle("hidden", !linked);
-  if (!linked) walletMenu.classList.add("hidden");
+  if (!linked && state.view === "wallet") navigate("home");
   if (linked) {
     navAvatarImg.src = `https://mc-heads.net/avatar/${encodeURIComponent(state.username)}/64`;
     navAvatarImg.alt = state.username;
@@ -221,31 +223,34 @@ logoutBtn.addEventListener("click", () => {
 });
 
 // ==============================
-// CARTERITA (desplegable de Deposit / Withdraw)
+// CARTERITA (ahora abre la página de Wallet en vez de un desplegable)
 // ==============================
-walletBtn.addEventListener("click", (e) => {
-  e.stopPropagation();
-  walletMenu.classList.toggle("hidden");
-});
-document.addEventListener("click", (e) => {
-  if (!walletMenu.classList.contains("hidden") && !walletMenu.contains(e.target) && e.target !== walletBtn) {
-    walletMenu.classList.add("hidden");
-  }
-});
-walletDepositBtn.addEventListener("click", () => {
-  walletMenu.classList.add("hidden");
-  openDepositModal();
-});
-walletWithdrawBtn.addEventListener("click", () => {
-  walletMenu.classList.add("hidden");
-  openWithdrawModal();
+walletBtn.addEventListener("click", () => {
+  if (!requireSession()) return;
+  navigate("wallet");
 });
 
 // ==============================
-// DEPOSIT
+// WALLET VIEW: pestañas Deposit / Withdraw
 // ==============================
-function openDepositModal(){
-  if (!requireSession()) return;
+function selectWalletTab(tab){
+  walletTabDeposit.classList.toggle("active", tab === "deposit");
+  walletTabWithdraw.classList.toggle("active", tab === "withdraw");
+  walletPanelDeposit.classList.toggle("hidden", tab !== "deposit");
+  walletPanelWithdraw.classList.toggle("hidden", tab !== "withdraw");
+}
+walletTabDeposit.addEventListener("click", () => selectWalletTab("deposit"));
+walletTabWithdraw.addEventListener("click", () => selectWalletTab("withdraw"));
+
+// Prepara (o refresca) toda la vista de Wallet: la tarjeta de cuenta y los
+// dos paneles (Deposit/Withdraw) — se llama cada vez que se navega a ella.
+async function renderWalletView(){
+  walletAccountAvatar.src = `https://mc-heads.net/avatar/${encodeURIComponent(state.username)}/48`;
+  walletAccountUsername.textContent = state.username;
+  updateBalanceDisplay();
+  selectWalletTab("deposit");
+
+  // --- Deposit panel ---
   depositFromAvatar.src = `https://mc-heads.net/avatar/${encodeURIComponent(state.username)}/48`;
   depositFromName.textContent = state.username;
   depositBotAvatar.src = `https://mc-heads.net/avatar/${BOT_IGN}/48`;
@@ -253,11 +258,29 @@ function openDepositModal(){
   depositAmount.value = "";
   depositContinueBtn.disabled = true;
   depositCommandBox.classList.add("hidden");
-  depositModal.classList.remove("hidden");
-}
-depositModalClose.addEventListener("click", () => depositModal.classList.add("hidden"));
-depositModal.addEventListener("click", (e) => { if (e.target === depositModal) depositModal.classList.add("hidden"); });
 
+  // --- Withdraw panel ---
+  withdrawBotAvatar.src = `https://mc-heads.net/avatar/${BOT_IGN}/48`;
+  withdrawBotName.textContent = BOT_IGN;
+  withdrawToAvatar.src = `https://mc-heads.net/avatar/${encodeURIComponent(state.username)}/48`;
+  withdrawToName.textContent = state.username;
+  withdrawAmount.value = "";
+  withdrawError.classList.add("hidden");
+  withdrawPendingNotice.classList.add("hidden");
+  withdrawRequestBtn.disabled = false;
+
+  try {
+    const data = await apiFetch(`/user-${encodeURIComponent(state.username)}`);
+    if (data.has_pending_withdrawal) {
+      withdrawPendingNotice.classList.remove("hidden");
+      withdrawRequestBtn.disabled = true;
+    }
+  } catch (e) { /* no bloquea la vista si falla la consulta */ }
+}
+
+// ==============================
+// DEPOSIT
+// ==============================
 depositAmount.addEventListener("input", () => {
   depositContinueBtn.disabled = !(Math.floor(parseShorthandAmount(depositAmount.value)) >= MIN_DEPOSIT);
   depositCommandBox.classList.add("hidden");
@@ -279,29 +302,6 @@ depositContinueBtn.addEventListener("click", () => {
 // ==============================
 // WITHDRAW
 // ==============================
-async function openWithdrawModal(){
-  if (!requireSession()) return;
-  withdrawBotAvatar.src = `https://mc-heads.net/avatar/${BOT_IGN}/48`;
-  withdrawBotName.textContent = BOT_IGN;
-  withdrawToAvatar.src = `https://mc-heads.net/avatar/${encodeURIComponent(state.username)}/48`;
-  withdrawToName.textContent = state.username;
-  withdrawAmount.value = "";
-  withdrawError.classList.add("hidden");
-  withdrawPendingNotice.classList.add("hidden");
-  withdrawRequestBtn.disabled = false;
-  withdrawModal.classList.remove("hidden");
-
-  try {
-    const data = await apiFetch(`/user-${encodeURIComponent(state.username)}`);
-    if (data.has_pending_withdrawal) {
-      withdrawPendingNotice.classList.remove("hidden");
-      withdrawRequestBtn.disabled = true;
-    }
-  } catch (e) { /* no bloquea el modal si falla la consulta */ }
-}
-withdrawModalClose.addEventListener("click", () => withdrawModal.classList.add("hidden"));
-withdrawModal.addEventListener("click", (e) => { if (e.target === withdrawModal) withdrawModal.classList.add("hidden"); });
-
 withdrawMaxBtn.addEventListener("click", () => {
   withdrawAmount.value = Math.max(0, Math.floor(state.balance));
 });
@@ -327,7 +327,7 @@ withdrawRequestBtn.addEventListener("click", async () => {
     });
     setBalance(data.balance);
     showToast(t("withdraw.success"), { type: "info" });
-    withdrawModal.classList.add("hidden");
+    withdrawAmount.value = "";
   } catch (e) {
     withdrawError.textContent = e.message;
     withdrawError.classList.remove("hidden");
@@ -529,8 +529,10 @@ function navigate(name){
   state.view = name;
   document.querySelectorAll(".sidebar-item").forEach((b) => b.classList.toggle("active", (b.dataset.game || b.dataset.view) === name));
   homeView.classList.toggle("hidden", name !== "home");
-  gameView.classList.toggle("hidden", name === "home");
-  if (name !== "home") { GAMES[name](); applyTranslations(); }
+  walletView.classList.toggle("hidden", name !== "wallet");
+  gameView.classList.toggle("hidden", name === "home" || name === "wallet");
+  if (name === "wallet") { renderWalletView(); applyTranslations(); }
+  else if (name !== "home") { GAMES[name](); applyTranslations(); }
 }
 document.querySelectorAll("[data-game], [data-view]").forEach((el) =>
   el.addEventListener("click", () => navigate(el.dataset.game || el.dataset.view)));
