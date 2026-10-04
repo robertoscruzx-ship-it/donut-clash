@@ -8,20 +8,22 @@ const userRoutes = require("../lib/routes/user");
 
 const app = express();
 
-// Función catch-all ÚNICA para toda la API (/api/*). Antes había un
-// archivo catch-all por grupo (account/, admin/, games/, user/), pero
-// Vercel estaba rechazando (404 a nivel de plataforma, nunca llegaba a
-// invocar la función) cualquier ruta con 2+ segmentos después del grupo
-// — por ejemplo /api/account/withdraw/next o /api/games/bet/coinflip —
-// pese a múltiples intentos de arreglarlo vía vercel.json. Reducir todo
-// a UNA sola función catch-all en la raíz de api/ con sub-routers de
-// Express por dentro evita ese problema por completo.
+// Función catch-all ÚNICA para toda la API (/api/*).
+//
+// IMPORTANTE: en este proyecto de Vercel, confirmado con los logs de
+// invocación (cero entradas para las rutas que fallaban), el router de
+// plataforma de Vercel SOLO invoca esta función cuando la URL tiene
+// EXACTAMENTE un segmento después de "/api/" (ej. "/api/algo" sí,
+// "/api/algo/otro" no, nunca llega ni siquiera a ejecutarse esta
+// función). Por eso TODAS las rutas son de un solo segmento usando
+// guiones como separador (ej. "/api/account-withdraw-next" en vez de
+// "/api/account/withdraw/next"). No reintroducir rutas con "/" internos.
 app.use(express.json());
 app.use(cors);
 
-app.use("/api/account", accountRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/games", gamesRoutes);
-app.use("/api/user", userRoutes);
+app.use(accountRoutes);
+app.use(adminRoutes);
+app.use(gamesRoutes);
+app.use(userRoutes);
 
 module.exports = app;

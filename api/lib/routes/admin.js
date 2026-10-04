@@ -6,7 +6,7 @@ const { requireAdminPanelAuth } = require("../auth");
 const router = express.Router();
 
 /**
- * POST /api/admin/stats
+ * POST /api/admin-stats
  * Body: { admin_password }
  *
  * Endpoint oculto (no está enlazado desde el frontend ni documentado ahí).
@@ -15,7 +15,7 @@ const router = express.Router();
  * mostrar los números reales de la sesión (total apostado, pagado, margen
  * real, cuántas fueron pérdida forzada, etc.).
  */
-router.post("/stats", requireAdminPanelAuth, async (req, res) => {
+router.post("/admin-stats", requireAdminPanelAuth, async (req, res) => {
   try {
     const bets = await getBetsCollection();
 

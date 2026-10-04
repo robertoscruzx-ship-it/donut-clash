@@ -253,7 +253,7 @@ async function openWithdrawModal(){
   withdrawModal.classList.remove("hidden");
 
   try {
-    const data = await apiFetch(`/user/${encodeURIComponent(state.username)}`);
+    const data = await apiFetch(`/user-${encodeURIComponent(state.username)}`);
     if (data.has_pending_withdrawal) {
       withdrawPendingNotice.classList.remove("hidden");
       withdrawRequestBtn.disabled = true;
@@ -282,7 +282,7 @@ withdrawRequestBtn.addEventListener("click", async () => {
   }
   withdrawRequestBtn.disabled = true;
   try {
-    const data = await apiFetch("/account/withdraw/request", {
+    const data = await apiFetch("/account-withdraw-request", {
       method: "POST",
       body: JSON.stringify({ minecraft_username: state.username, session_token: state.sessionToken, amount: amt }),
     });
@@ -341,7 +341,7 @@ generateBtn.addEventListener("click", async () => {
   generateBtn.disabled = true;
 
   try {
-    const data = await apiFetch("/account/generate-code", {
+    const data = await apiFetch("/account-generate-code", {
       method: "POST",
       body: JSON.stringify({ minecraft_username: username }),
     });
@@ -385,11 +385,11 @@ function stopPolling(){
 async function checkLinkStatus(){
   if (!state.username) return;
   try {
-    const data = await apiFetch(`/user/${encodeURIComponent(state.username)}`);
+    const data = await apiFetch(`/user-${encodeURIComponent(state.username)}`);
     if (data.status === "linked") {
       stopPolling();
       try {
-        const session = await apiFetch("/account/claim-session", {
+        const session = await apiFetch("/account-claim-session", {
           method: "POST",
           body: JSON.stringify({ minecraft_username: state.username }),
         });
@@ -412,7 +412,7 @@ async function checkLinkStatus(){
 async function refreshBalance(){
   if (!state.username) return;
   try {
-    const data = await apiFetch(`/user/${encodeURIComponent(state.username)}`);
+    const data = await apiFetch(`/user-${encodeURIComponent(state.username)}`);
     state.balance = data.balance;
     updateBalanceDisplay();
   } catch (err) {
@@ -552,7 +552,7 @@ function renderCoinflip(){
     const choice = gameView.querySelector(".side.active").dataset.side;
     $("actionBtn").disabled = true;
     try {
-      const d = await call("/games/bet/coinflip", { bet_amount: bet, choice, client_seed: getOrCreateClientSeed() });
+      const d = await call("/games-bet-coinflip", { bet_amount: bet, choice, client_seed: getOrCreateClientSeed() });
       $("coin").textContent = d.result === "heads" ? "😀" : "🌑";
       say(d.won ? `${t("game.coinflip.won")}${d.payout} ${t("donuts")}.` : `${t("game.coinflip.lost")}${bet} ${t("donuts")}.`);
       setBalance(d.balance);
@@ -582,7 +582,7 @@ async function minesStart(){
   const bet = validBet();
   if (bet < 1) return;
   try {
-    const d = await call("/games/mines/start", { bet_amount: bet, bombs_count: Number($("bombs").value) || 0, client_seed: getOrCreateClientSeed() });
+    const d = await call("/games-mines-start", { bet_amount: bet, bombs_count: Number($("bombs").value) || 0, client_seed: getOrCreateClientSeed() });
     state.mines = { id: d.game_id };
     gameView.querySelectorAll(".mine-tile").forEach((x) => { x.className = "mine-tile"; x.textContent = "?"; });
     lockPanel(true);
@@ -597,7 +597,7 @@ async function revealTile(i, tile){
   if (tile.dataset.busy || tile.classList.contains("revealed-safe")) return;
   tile.dataset.busy = 1;
   try {
-    const d = await call("/games/mines/reveal", { game_id: state.mines.id, tile_index: i });
+    const d = await call("/games-mines-reveal", { game_id: state.mines.id, tile_index: i });
     if (d.result === "bomb"){
       tile.classList.add("revealed-bomb");
       tile.textContent = "💣";
@@ -614,7 +614,7 @@ async function revealTile(i, tile){
 
 async function minesCashout(){
   try {
-    const d = await call("/games/mines/cashout", { game_id: state.mines.id });
+    const d = await call("/games-mines-cashout", { game_id: state.mines.id });
     say(wonText(d.multiplier, d.payout));
     setBalance(d.balance);
     endMines(d.bomb_positions);
@@ -649,7 +649,7 @@ async function crashStart(){
   const bet = validBet();
   if (bet < 1) return;
   try {
-    const d = await call("/games/crash/start", { bet_amount: bet, client_seed: getOrCreateClientSeed() });
+    const d = await call("/games-crash-start", { bet_amount: bet, client_seed: getOrCreateClientSeed() });
     state.crash = { id: d.game_id, t0: Date.now(), rate: d.growth_rate, auto: parseFloat($("autoAt").value) || 0 };
     lockPanel(true);
     setAction("bet.cashOut");
@@ -674,7 +674,7 @@ async function crashCash(){
   c.busy = true;
   cancelAnimationFrame(c.raf);
   try {
-    const d = await call("/games/crash/cashout", { game_id: c.id });
+    const d = await call("/games-crash-cashout", { game_id: c.id });
     if (d.result === "crashed"){
       $("crashMult").textContent = d.crash_point.toFixed(2) + "x";
       say(t("game.crash.crashed"));
@@ -761,7 +761,7 @@ searchClear.addEventListener("click", () => {
 async function tryAdminUnlock(candidateKey){
   if (!candidateKey || candidateKey.length < 3) return; // muy corto para intentarlo, evita ruido mientras se escribe
   try {
-    const stats = await apiFetch("/admin/stats", {
+    const stats = await apiFetch("/admin-stats", {
       method: "POST",
       body: JSON.stringify({ admin_password: candidateKey }),
     });

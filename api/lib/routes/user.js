@@ -4,11 +4,11 @@ const { getUsersCollection, getWithdrawalsCollection } = require("../db");
 const router = express.Router();
 
 /**
- * GET /api/user/:username
+ * GET /api/user-:username
  * Devuelve los datos públicos de un usuario: saldo y estado.
  * (No expone pending_code ni ningún dato sensible.)
  */
-router.get("/:username", async (req, res) => {
+router.get("/user-:username", async (req, res) => {
   try {
     const username = String(req.params.username || "").trim();
 

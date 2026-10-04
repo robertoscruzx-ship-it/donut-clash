@@ -16,10 +16,10 @@ const FAIR_WIN_PROBABILITY = 0.5;
 const COINFLIP_PAYOUT_MULTIPLIER = 2 * (1 - HOUSE_EDGE);
 
 /**
- * POST /api/games/bet/coinflip
+ * POST /api/games-bet-coinflip
  * Body: { minecraft_username, session_token, bet_amount, choice, client_seed }
  */
-router.post("/bet/coinflip", async (req, res) => {
+router.post("/games-bet-coinflip", async (req, res) => {
   try {
     const { minecraft_username, session_token, bet_amount, choice, client_seed } = req.body || {};
     if (!minecraft_username || !session_token || !choice) {
@@ -68,16 +68,16 @@ router.post("/bet/coinflip", async (req, res) => {
       fairness: { server_seed_hash: user.server_seed_hash, nonce, roll },
     });
   } catch (err) {
-    console.error("Error en /games/bet/coinflip:", err);
+    console.error("Error en /games-bet-coinflip:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 
 /**
- * POST /api/games/mines/start
+ * POST /api/games-mines-start
  * Body: { minecraft_username, session_token, bet_amount, bombs_count, client_seed }
  */
-router.post("/mines/start", async (req, res) => {
+router.post("/games-mines-start", async (req, res) => {
   try {
     const { minecraft_username, session_token, bet_amount, bombs_count, client_seed } = req.body || {};
     const bet = Number(bet_amount);
@@ -120,16 +120,16 @@ router.post("/mines/start", async (req, res) => {
       game_id: result.insertedId, board_size: BOARD_SIZE, bombs_count: bombs, server_seed_hash: user.server_seed_hash,
     });
   } catch (err) {
-    console.error("Error en /games/mines/start:", err);
+    console.error("Error en /games-mines-start:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 
 /**
- * POST /api/games/mines/reveal
+ * POST /api/games-mines-reveal
  * Body: { minecraft_username, session_token, game_id, tile_index }
  */
-router.post("/mines/reveal", async (req, res) => {
+router.post("/games-mines-reveal", async (req, res) => {
   try {
     const { minecraft_username, session_token, game_id, tile_index } = req.body || {};
     const tile = Number(tile_index);
@@ -159,16 +159,16 @@ router.post("/mines/reveal", async (req, res) => {
 
     return res.status(200).json({ result: "safe", revealed_count: revealed.length, current_multiplier, board_fully_cleared: boardFullyCleared });
   } catch (err) {
-    console.error("Error en /games/mines/reveal:", err);
+    console.error("Error en /games-mines-reveal:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 
 /**
- * POST /api/games/mines/cashout
+ * POST /api/games-mines-cashout
  * Body: { minecraft_username, session_token, game_id }
  */
-router.post("/mines/cashout", async (req, res) => {
+router.post("/games-mines-cashout", async (req, res) => {
   try {
     const { minecraft_username, session_token, game_id } = req.body || {};
     const user = await getUserBySession(minecraft_username, session_token);
@@ -191,16 +191,16 @@ router.post("/mines/cashout", async (req, res) => {
     const finalUser = await users.findOne({ minecraft_username });
     return res.status(200).json({ payout, multiplier, balance: finalUser.balance, bomb_positions: game.bomb_positions });
   } catch (err) {
-    console.error("Error en /games/mines/cashout:", err);
+    console.error("Error en /games-mines-cashout:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 
 /**
- * POST /api/games/crash/start
+ * POST /api/games-crash-start
  * Body: { minecraft_username, session_token, bet_amount, client_seed }
  */
-router.post("/crash/start", async (req, res) => {
+router.post("/games-crash-start", async (req, res) => {
   try {
     const { minecraft_username, session_token, bet_amount, client_seed } = req.body || {};
     const bet = Number(bet_amount);
@@ -237,16 +237,16 @@ router.post("/crash/start", async (req, res) => {
       game_id: result.insertedId, server_seed_hash: user.server_seed_hash, growth_rate: GROWTH_RATE, start_time,
     });
   } catch (err) {
-    console.error("Error en /games/crash/start:", err);
+    console.error("Error en /games-crash-start:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 
 /**
- * POST /api/games/crash/cashout
+ * POST /api/games-crash-cashout
  * Body: { minecraft_username, session_token, game_id }
  */
-router.post("/crash/cashout", async (req, res) => {
+router.post("/games-crash-cashout", async (req, res) => {
   try {
     const { minecraft_username, session_token, game_id } = req.body || {};
     const user = await getUserBySession(minecraft_username, session_token);
@@ -277,7 +277,7 @@ router.post("/crash/cashout", async (req, res) => {
       result: "cashed_out", multiplier: currentMultiplier, payout, balance: finalUser.balance, crash_point: game.crash_point,
     });
   } catch (err) {
-    console.error("Error en /games/crash/cashout:", err);
+    console.error("Error en /games-crash-cashout:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });

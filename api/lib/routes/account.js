@@ -8,11 +8,19 @@ const { randomServerSeed, hashServerSeed } = require("../fairness");
 
 const router = express.Router();
 
+// NOTA IMPORTANTE: Vercel, en este proyecto, solo invoca la función
+// catch-all cuando la ruta tiene EXACTAMENTE un segmento después de
+// "/api/" (ej. "/api/algo" funciona, "/api/algo/otro" da 404 a nivel de
+// plataforma, confirmado con los logs de Vercel: cero invocaciones).
+// Por eso TODAS las rutas aquí son de un solo segmento, usando guiones
+// en vez de "/" para separar grupo/acción (ej. "/account-generate-code"
+// en vez de "/account/generate-code").
+
 /**
- * POST /api/account/generate-code
+ * POST /api/account-generate-code
  * Body: { minecraft_username }
  */
-router.post("/generate-code", async (req, res) => {
+router.post("/account-generate-code", async (req, res) => {
   try {
     const { minecraft_username } = req.body || {};
     if (!minecraft_username || typeof minecraft_username !== "string") {
@@ -34,17 +42,17 @@ router.post("/generate-code", async (req, res) => {
     );
     return res.status(200).json({ minecraft_username: username, code, status: "pending" });
   } catch (err) {
-    console.error("Error en /account/generate-code:", err);
+    console.error("Error en /account-generate-code:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 
 /**
- * POST /api/account/verify-link
+ * POST /api/account-verify-link
  * Body: { minecraft_username, payment_amount, api_key }
  * Protegido por api_key (lo llama el bot, no el frontend).
  */
-router.post("/verify-link", requireApiKey, async (req, res) => {
+router.post("/account-verify-link", requireApiKey, async (req, res) => {
   try {
     const { minecraft_username, payment_amount } = req.body || {};
     if (!minecraft_username || payment_amount === undefined) {
@@ -67,16 +75,16 @@ router.post("/verify-link", requireApiKey, async (req, res) => {
     );
     return res.status(200).json({ minecraft_username: username, status: "linked" });
   } catch (err) {
-    console.error("Error en /account/verify-link:", err);
+    console.error("Error en /account-verify-link:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 
 /**
- * POST /api/account/claim-session
+ * POST /api/account-claim-session
  * Body: { minecraft_username }
  */
-router.post("/claim-session", async (req, res) => {
+router.post("/account-claim-session", async (req, res) => {
   try {
     const { minecraft_username } = req.body || {};
     if (!minecraft_username) return res.status(400).json({ error: "minecraft_username es requerido." });
@@ -98,17 +106,17 @@ router.post("/claim-session", async (req, res) => {
     );
     return res.status(200).json({ session_token, server_seed_hash });
   } catch (err) {
-    console.error("Error en /account/claim-session:", err);
+    console.error("Error en /account-claim-session:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 
 /**
- * POST /api/account/deposit-donuts
+ * POST /api/account-deposit-donuts
  * Body: { minecraft_username, amount, api_key }
  * Protegido por api_key (lo llama el bot, no el frontend).
  */
-router.post("/deposit-donuts", requireApiKey, async (req, res) => {
+router.post("/account-deposit-donuts", requireApiKey, async (req, res) => {
   try {
     const { minecraft_username, amount } = req.body || {};
     if (!minecraft_username || amount === undefined) {
@@ -132,16 +140,16 @@ router.post("/deposit-donuts", requireApiKey, async (req, res) => {
     );
     return res.status(200).json({ minecraft_username: username, balance: result.balance });
   } catch (err) {
-    console.error("Error en /account/deposit-donuts:", err);
+    console.error("Error en /account-deposit-donuts:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 
 /**
- * POST /api/account/fairness/reveal
+ * POST /api/account-fairness-reveal
  * Body: { minecraft_username, session_token }
  */
-router.post("/fairness/reveal", async (req, res) => {
+router.post("/account-fairness-reveal", async (req, res) => {
   try {
     const { minecraft_username, session_token } = req.body || {};
     const user = await getUserBySession(minecraft_username, session_token);
@@ -162,13 +170,13 @@ router.post("/fairness/reveal", async (req, res) => {
 
     return res.status(200).json({ revealed_server_seed, revealed_hash, total_bets_under_seed, new_server_seed_hash });
   } catch (err) {
-    console.error("Error en /account/fairness/reveal:", err);
+    console.error("Error en /account-fairness-reveal:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 
 /**
- * POST /api/account/withdraw/request
+ * POST /api/account-withdraw-request
  * Body: { minecraft_username, session_token, amount }
  * Autenticado por sesión (lo llama el frontend, no el bot).
  *
@@ -178,7 +186,7 @@ router.post("/fairness/reveal", async (req, res) => {
  */
 const MIN_WITHDRAWAL = 10000;
 
-router.post("/withdraw/request", async (req, res) => {
+router.post("/account-withdraw-request", async (req, res) => {
   try {
     const { minecraft_username, session_token, amount } = req.body || {};
     const user = await getUserBySession(minecraft_username, session_token);
@@ -224,7 +232,7 @@ router.post("/withdraw/request", async (req, res) => {
 
     return res.status(200).json({ status: "pending", balance: result.balance });
   } catch (err) {
-    console.error("Error en /account/withdraw/request:", err);
+    console.error("Error en /account-withdraw-request:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
@@ -233,11 +241,11 @@ const WITHDRAW_MAX_ATTEMPTS = 2;
 const WITHDRAW_COOLDOWN_MS = 60 * 1000; // 1 minuto entre intentos
 
 /**
- * POST /api/account/withdraw/next
+ * POST /api/account-withdraw-next
  * Body: { api_key }
  * Protegido por api_key (lo llama el bot cada ~15s).
  */
-router.post("/withdraw/next", requireApiKey, async (req, res) => {
+router.post("/account-withdraw-next", requireApiKey, async (req, res) => {
   try {
     const withdrawals = await getWithdrawalsCollection();
     const cutoff = new Date(Date.now() - WITHDRAW_COOLDOWN_MS);
@@ -268,17 +276,17 @@ router.post("/withdraw/next", requireApiKey, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Error en /account/withdraw/next:", err);
+    console.error("Error en /account-withdraw-next:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 
 /**
- * POST /api/account/withdraw/confirm
+ * POST /api/account-withdraw-confirm
  * Body: { api_key, withdrawal_id, success }
  * Protegido por api_key (lo llama el bot tras intentar el pago en el juego).
  */
-router.post("/withdraw/confirm", requireApiKey, async (req, res) => {
+router.post("/account-withdraw-confirm", requireApiKey, async (req, res) => {
   try {
     const { withdrawal_id, success } = req.body || {};
     if (!withdrawal_id) return res.status(400).json({ error: "withdrawal_id es requerido." });
@@ -314,7 +322,7 @@ router.post("/withdraw/confirm", requireApiKey, async (req, res) => {
     await withdrawals.updateOne({ _id: withdrawal._id }, { $set: { status: "pending" } });
     return res.status(200).json({ status: "pending_retry" });
   } catch (err) {
-    console.error("Error en /account/withdraw/confirm:", err);
+    console.error("Error en /account-withdraw-confirm:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
