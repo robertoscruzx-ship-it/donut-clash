@@ -34,6 +34,8 @@ function getOrCreateClientSeed() {
 const balanceValue = document.getElementById("balanceValue");
 const signInBtn = document.getElementById("signInBtn");
 const registerBtn = document.getElementById("registerBtn");
+const navAvatarBtn = document.getElementById("navAvatarBtn");
+const navAvatarImg = document.getElementById("navAvatarImg");
 const langSelect = document.getElementById("langSelect");
 
 const authModal = document.getElementById("authModal");
@@ -86,6 +88,20 @@ function updateBalanceDisplay(){
   balanceValue.textContent = state.balance;
 }
 
+// Cambia Sign In / Register por la cabeza de Minecraft del jugador
+// en cuanto hay una sesión vinculada.
+function updateAuthUI(){
+  const linked = !!(state.sessionToken && state.username);
+  signInBtn.classList.toggle("hidden", linked);
+  registerBtn.classList.toggle("hidden", linked);
+  navAvatarBtn.classList.toggle("hidden", !linked);
+  if (linked) {
+    navAvatarImg.src = `https://mc-heads.net/avatar/${encodeURIComponent(state.username)}/64`;
+    navAvatarImg.alt = state.username;
+    navAvatarBtn.title = state.username;
+  }
+}
+
 // ==============================
 // MODAL: abrir / cerrar
 // ==============================
@@ -109,6 +125,7 @@ function closeModal(){
 
 signInBtn.addEventListener("click", openModal);
 registerBtn.addEventListener("click", openModal);
+navAvatarBtn.addEventListener("click", openModal);
 modalClose.addEventListener("click", closeModal);
 modalAlreadyCloseBtn.addEventListener("click", closeModal);
 authModal.addEventListener("click", (e) => { if (e.target === authModal) closeModal(); });
@@ -217,6 +234,7 @@ async function checkLinkStatus(){
       }
       state.balance = data.balance || 0;
       updateBalanceDisplay();
+      updateAuthUI();
       closeModal();
       startBalanceLoop();
     }
@@ -511,6 +529,7 @@ try {
   if (saved && saved.u && saved.t) {
     state.username = saved.u;
     state.sessionToken = saved.t;
+    updateAuthUI();
     refreshBalance();
     startBalanceLoop();
   }

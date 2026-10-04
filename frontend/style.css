@@ -74,6 +74,22 @@ body{
 }
 .btn-accent-sm:hover{background:var(--accent-hover);}
 
+.nav-avatar{
+  background:var(--panel-alt);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:3px;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  width:38px; height:38px;
+}
+.nav-avatar:hover{border-color:var(--accent);}
+.nav-avatar img{
+  width:100%; height:100%;
+  image-rendering:pixelated;
+  border-radius:5px;
+}
+
 .lang-select{
   background:var(--panel-alt);
   color:var(--text);
