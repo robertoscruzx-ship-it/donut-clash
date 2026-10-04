@@ -14,11 +14,25 @@
     <header class="topbar">
       <div class="logo" id="logoLink" style="cursor:pointer">🍩 <span>Donut</span><span class="accent">Clash</span></div>
 
-      <div class="topbar-right">
+      <div class="topbar-center">
         <div class="balance-pill">
           <span class="coin-icon">🪙</span>
           <span id="balanceValue">0</span>
         </div>
+        <button id="walletBtn" class="wallet-btn hidden" aria-label="Wallet" aria-haspopup="true">
+          <span class="wallet-icon">👛</span>
+        </button>
+        <div id="walletMenu" class="wallet-menu hidden">
+          <button id="walletDepositBtn" class="wallet-menu-item">
+            <span class="wallet-menu-icon">⬇️</span><span data-i18n="wallet.deposit">Deposit</span>
+          </button>
+          <button id="walletWithdrawBtn" class="wallet-menu-item">
+            <span class="wallet-menu-icon">⬆️</span><span data-i18n="wallet.withdraw">Withdraw</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="topbar-right">
         <button id="signInBtn" class="btn-ghost" data-i18n="nav.signIn">Sign In</button>
         <button id="registerBtn" class="btn-accent-sm" data-i18n="nav.register">Register</button>
         <button id="navAvatarBtn" class="nav-avatar hidden" aria-label="Account">
@@ -136,10 +150,109 @@
       </div>
 
       <div id="modalAlreadyLinked" class="hidden">
-        <h2 data-i18n="modal.alreadyTitle">You're already linked in</h2>
-        <p class="muted small" data-i18n="modal.alreadyBody">You can close this window and play right away.</p>
+        <h2 data-i18n="account.title">Account</h2>
+        <div class="account-row">
+          <img id="accountAvatarImg" class="transfer-avatar" alt="">
+          <div class="account-identity">
+            <div class="transfer-name" id="accountUsername"></div>
+            <div class="transfer-label" data-i18n="account.linked">Linked</div>
+          </div>
+          <span class="status-badge" data-i18n="account.active">Active</span>
+        </div>
+        <div class="account-row">
+          <div class="transfer-label" data-i18n="account.balance">BALANCE</div>
+          <div class="account-balance"><span class="coin-icon">🪙</span><span id="accountBalanceValue">0</span></div>
+        </div>
         <button id="modalAlreadyCloseBtn" class="btn-primary" data-i18n="modal.close">Close</button>
+        <button id="logoutBtn" class="btn-secondary btn-logout" data-i18n="account.logout">Log out</button>
       </div>
+    </div>
+  </div>
+
+  <!-- DEPOSIT MODAL -->
+  <div id="depositModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <button id="depositModalClose" class="modal-close" aria-label="Close">&times;</button>
+      <h2 data-i18n="deposit.title">Deposit</h2>
+
+      <div class="transfer-row">
+        <div class="transfer-box">
+          <img id="depositFromAvatar" class="transfer-avatar" alt="">
+          <div>
+            <div class="transfer-name" id="depositFromName"></div>
+            <div class="transfer-label" data-i18n="deposit.yourAccount">YOUR ACCOUNT</div>
+          </div>
+        </div>
+        <div class="transfer-arrow">→</div>
+        <div class="transfer-box">
+          <img id="depositBotAvatar" class="transfer-avatar" alt="">
+          <div>
+            <div class="transfer-name" id="depositBotName"></div>
+            <div class="transfer-label" data-i18n="deposit.bot">DEPOSIT BOT</div>
+          </div>
+        </div>
+      </div>
+
+      <label class="bet-label" data-i18n="deposit.amount">DEPOSIT AMOUNT</label>
+      <div class="amount-input-row">
+        <span class="coin-icon">🪙</span>
+        <input type="number" id="depositAmount" min="10000" data-i18n-placeholder="modal.usernamePlaceholder" placeholder="Enter amount">
+      </div>
+      <p class="muted small"><span data-i18n="deposit.minimumPrefix">Minimum deposit: </span><strong>10K</strong></p>
+
+      <div class="chip-row">
+        <button class="chip amount-chip" data-amount="10000000">10M</button>
+        <button class="chip amount-chip" data-amount="25000000">25M</button>
+        <button class="chip amount-chip" data-amount="50000000">50M</button>
+        <button class="chip amount-chip" data-amount="100000000">100M</button>
+        <button class="chip amount-chip" data-amount="250000000">250M</button>
+      </div>
+
+      <button id="depositContinueBtn" class="btn-primary" disabled data-i18n="deposit.continue">Continue Deposit</button>
+
+      <div id="depositCommandBox" class="hidden">
+        <p class="muted small" data-i18n="deposit.instructions">Join the server and run this command exactly:</p>
+        <div class="code-box"><span id="depositPayCommand"></span></div>
+        <p class="muted small" data-i18n="deposit.autoCredit">We'll credit your balance automatically within a few seconds of the payment.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- WITHDRAW MODAL -->
+  <div id="withdrawModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <button id="withdrawModalClose" class="modal-close" aria-label="Close">&times;</button>
+      <h2 data-i18n="withdraw.title">Withdraw</h2>
+
+      <div class="transfer-row">
+        <div class="transfer-box">
+          <img id="withdrawBotAvatar" class="transfer-avatar" alt="">
+          <div>
+            <div class="transfer-name" id="withdrawBotName"></div>
+            <div class="transfer-label" data-i18n="deposit.bot">DEPOSIT BOT</div>
+          </div>
+        </div>
+        <div class="transfer-arrow">→</div>
+        <div class="transfer-box">
+          <img id="withdrawToAvatar" class="transfer-avatar" alt="">
+          <div>
+            <div class="transfer-name" id="withdrawToName"></div>
+            <div class="transfer-label" data-i18n="deposit.yourAccount">YOUR ACCOUNT</div>
+          </div>
+        </div>
+      </div>
+
+      <label class="bet-label" data-i18n="withdraw.amount">WITHDRAWAL AMOUNT</label>
+      <div class="amount-input-row">
+        <span class="coin-icon">🪙</span>
+        <input type="number" id="withdrawAmount" min="10000" data-i18n-placeholder="modal.usernamePlaceholder" placeholder="Enter amount">
+        <button id="withdrawMaxBtn" class="chip" data-i18n="bet.max">MAX</button>
+      </div>
+      <p class="muted small"><span data-i18n="withdraw.minimumPrefix">Minimum withdrawal: </span><strong>10K</strong></p>
+      <p id="withdrawError" class="error hidden"></p>
+      <p id="withdrawPendingNotice" class="muted small hidden" data-i18n="withdraw.pendingNotice">You already have a pending withdrawal request.</p>
+
+      <button id="withdrawRequestBtn" class="btn-primary" data-i18n="withdraw.request">Request Withdrawal</button>
     </div>
   </div>
 

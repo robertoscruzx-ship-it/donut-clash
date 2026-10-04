@@ -1,5 +1,5 @@
 const express = require("express");
-const { getUsersCollection } = require("../../lib/db");
+const { getUsersCollection, getWithdrawalsCollection } = require("../../lib/db");
 const { cors } = require("../../lib/cors");
 
 const app = express();
@@ -31,10 +31,17 @@ app.get("*", async (req, res) => {
       return res.status(404).json({ error: "Usuario no encontrado." });
     }
 
+    const withdrawals = await getWithdrawalsCollection();
+    const pendingWithdrawal = await withdrawals.findOne({
+      minecraft_username: user.minecraft_username,
+      status: "pending",
+    });
+
     return res.status(200).json({
       minecraft_username: user.minecraft_username,
       status: user.status,
       balance: user.balance || 0,
+      has_pending_withdrawal: !!pendingWithdrawal,
     });
   } catch (err) {
     console.error("Error en /user/:username:", err);

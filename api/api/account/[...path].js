@@ -1,7 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const { ObjectId } = require("mongodb");
-const { getUsersCollection } = require("../../lib/db");
+const { getUsersCollection, getWithdrawalsCollection } = require("../../lib/db");
 const { cors } = require("../../lib/cors");
 const { requireApiKey } = require("../../lib/auth");
 const { getUserBySession } = require("../../lib/session");
@@ -176,6 +176,73 @@ app.post("/fairness/reveal", async (req, res) => {
     return res.status(200).json({ revealed_server_seed, revealed_hash, total_bets_under_seed, new_server_seed_hash });
   } catch (err) {
     console.error("Error en /account/fairness/reveal:", err);
+    return res.status(500).json({ error: "Error interno del servidor." });
+  }
+});
+
+/**
+ * POST /api/account/withdraw/request
+ * Body: { minecraft_username, session_token, amount }
+ * Autenticado por sesión (lo llama el frontend, no el bot).
+ *
+ * Valida monto > 0, <= saldo, >= mínimo, y que no haya ya un retiro
+ * pendiente para ese usuario. Descuenta el saldo de inmediato (para que
+ * no se pueda gastar mientras está en cola) y encola la solicitud.
+ *
+ * NOTA: esto solo registra la solicitud. El pago real en el juego (el bot
+ * detectando y ejecutando el pago de salida) todavía no está implementado
+ * — es el siguiente paso pendiente del proyecto.
+ */
+const MIN_WITHDRAWAL = 10000;
+
+app.post("/withdraw/request", async (req, res) => {
+  try {
+    const { minecraft_username, session_token, amount } = req.body || {};
+    const user = await getUserBySession(minecraft_username, session_token);
+    if (!user) return res.status(401).json({ error: "Sesión inválida." });
+
+    const requestedAmount = Math.floor(Number(amount));
+    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+      return res.status(400).json({ error: "El monto debe ser un número positivo." });
+    }
+    if (requestedAmount < MIN_WITHDRAWAL) {
+      return res.status(400).json({ error: `El retiro mínimo es ${MIN_WITHDRAWAL.toLocaleString("en-US")} donuts.` });
+    }
+    if (requestedAmount > (user.balance || 0)) {
+      return res.status(400).json({ error: "No tienes saldo suficiente." });
+    }
+
+    const withdrawals = await getWithdrawalsCollection();
+    const existingPending = await withdrawals.findOne({
+      minecraft_username: user.minecraft_username,
+      status: "pending",
+    });
+    if (existingPending) {
+      return res.status(409).json({ error: "Ya tienes un retiro pendiente. Espera a que se complete." });
+    }
+
+    const users = await getUsersCollection();
+    // $gte evita condiciones de carrera: solo descuenta si el saldo sigue alcanzando.
+    const result = await users.findOneAndUpdate(
+      { minecraft_username: user.minecraft_username, balance: { $gte: requestedAmount } },
+      { $inc: { balance: -requestedAmount }, $set: { updated_at: new Date() } },
+      { returnDocument: "after" }
+    );
+    if (!result.value) {
+      return res.status(400).json({ error: "No tienes saldo suficiente." });
+    }
+
+    await withdrawals.insertOne({
+      minecraft_username: user.minecraft_username,
+      amount: requestedAmount,
+      status: "pending",
+      attempts: 0,
+      created_at: new Date(),
+    });
+
+    return res.status(200).json({ status: "pending", balance: result.value.balance });
+  } catch (err) {
+    console.error("Error en /account/withdraw/request:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });

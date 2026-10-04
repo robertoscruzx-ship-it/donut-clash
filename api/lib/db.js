@@ -50,6 +50,11 @@ async function getBetsCollection() {
   return db.collection("bets");
 }
 
+async function getWithdrawalsCollection() {
+  const db = await connectToDatabase();
+  return db.collection("withdrawals");
+}
+
 module.exports = {
   connectToDatabase,
   getUsersCollection,
@@ -57,4 +62,5 @@ module.exports = {
   getCrashGamesCollection,
   getHouseCollection,
   getBetsCollection,
+  getWithdrawalsCollection,
 };

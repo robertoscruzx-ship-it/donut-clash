@@ -3,6 +3,8 @@
 // ==============================
 const API_BASE_URL = "https://donut-clash-rho.vercel.app/api";
 const BOT_IGN = "rCrux"; // nombre real del bot dentro de Minecraft
+const MIN_DEPOSIT = 10000;
+const MIN_WITHDRAWAL = 10000;
 
 // ==============================
 // ESTADO GLOBAL
@@ -38,12 +40,21 @@ const navAvatarBtn = document.getElementById("navAvatarBtn");
 const navAvatarImg = document.getElementById("navAvatarImg");
 const langSelect = document.getElementById("langSelect");
 
+const walletBtn = document.getElementById("walletBtn");
+const walletMenu = document.getElementById("walletMenu");
+const walletDepositBtn = document.getElementById("walletDepositBtn");
+const walletWithdrawBtn = document.getElementById("walletWithdrawBtn");
+
 const authModal = document.getElementById("authModal");
 const modalClose = document.getElementById("modalClose");
 const modalStep1 = document.getElementById("modalStep1");
 const modalStep2 = document.getElementById("modalStep2");
 const modalAlreadyLinked = document.getElementById("modalAlreadyLinked");
 const modalAlreadyCloseBtn = document.getElementById("modalAlreadyCloseBtn");
+const accountAvatarImg = document.getElementById("accountAvatarImg");
+const accountUsername = document.getElementById("accountUsername");
+const accountBalanceValue = document.getElementById("accountBalanceValue");
+const logoutBtn = document.getElementById("logoutBtn");
 
 const mcUsername = document.getElementById("mcUsername");
 const generateBtn = document.getElementById("generateBtn");
@@ -53,6 +64,29 @@ const linkError = document.getElementById("linkError");
 const skinPreview = document.getElementById("skinPreview");
 const skinPreviewImg = document.getElementById("skinPreviewImg");
 const skinPreviewName = document.getElementById("skinPreviewName");
+
+const depositModal = document.getElementById("depositModal");
+const depositModalClose = document.getElementById("depositModalClose");
+const depositFromAvatar = document.getElementById("depositFromAvatar");
+const depositFromName = document.getElementById("depositFromName");
+const depositBotAvatar = document.getElementById("depositBotAvatar");
+const depositBotName = document.getElementById("depositBotName");
+const depositAmount = document.getElementById("depositAmount");
+const depositContinueBtn = document.getElementById("depositContinueBtn");
+const depositCommandBox = document.getElementById("depositCommandBox");
+const depositPayCommand = document.getElementById("depositPayCommand");
+
+const withdrawModal = document.getElementById("withdrawModal");
+const withdrawModalClose = document.getElementById("withdrawModalClose");
+const withdrawBotAvatar = document.getElementById("withdrawBotAvatar");
+const withdrawBotName = document.getElementById("withdrawBotName");
+const withdrawToAvatar = document.getElementById("withdrawToAvatar");
+const withdrawToName = document.getElementById("withdrawToName");
+const withdrawAmount = document.getElementById("withdrawAmount");
+const withdrawMaxBtn = document.getElementById("withdrawMaxBtn");
+const withdrawError = document.getElementById("withdrawError");
+const withdrawPendingNotice = document.getElementById("withdrawPendingNotice");
+const withdrawRequestBtn = document.getElementById("withdrawRequestBtn");
 
 const homeView = document.getElementById("homeView");
 const gameView = document.getElementById("gameView");
@@ -86,15 +120,18 @@ async function apiFetch(path, options = {}){
 }
 function updateBalanceDisplay(){
   balanceValue.textContent = state.balance;
+  if (accountBalanceValue) accountBalanceValue.textContent = state.balance;
 }
 
 // Cambia Sign In / Register por la cabeza de Minecraft del jugador
-// en cuanto hay una sesión vinculada.
+// en cuanto hay una sesión vinculada, y muestra/oculta la carterita.
 function updateAuthUI(){
   const linked = !!(state.sessionToken && state.username);
   signInBtn.classList.toggle("hidden", linked);
   registerBtn.classList.toggle("hidden", linked);
   navAvatarBtn.classList.toggle("hidden", !linked);
+  walletBtn.classList.toggle("hidden", !linked);
+  if (!linked) walletMenu.classList.add("hidden");
   if (linked) {
     navAvatarImg.src = `https://mc-heads.net/avatar/${encodeURIComponent(state.username)}/64`;
     navAvatarImg.alt = state.username;
@@ -111,6 +148,9 @@ function openModal(){
     modalStep1.classList.add("hidden");
     modalStep2.classList.add("hidden");
     modalAlreadyLinked.classList.remove("hidden");
+    accountAvatarImg.src = `https://mc-heads.net/avatar/${encodeURIComponent(state.username)}/48`;
+    accountUsername.textContent = state.username;
+    accountBalanceValue.textContent = state.balance;
   } else {
     modalAlreadyLinked.classList.add("hidden");
     modalStep2.classList.add("hidden");
@@ -129,6 +169,132 @@ navAvatarBtn.addEventListener("click", openModal);
 modalClose.addEventListener("click", closeModal);
 modalAlreadyCloseBtn.addEventListener("click", closeModal);
 authModal.addEventListener("click", (e) => { if (e.target === authModal) closeModal(); });
+
+logoutBtn.addEventListener("click", () => {
+  state.username = null;
+  state.sessionToken = null;
+  state.balance = 0;
+  stopBalanceLoop();
+  try { localStorage.removeItem("dc_session"); } catch (e) {}
+  updateBalanceDisplay();
+  updateAuthUI();
+  closeModal();
+});
+
+// ==============================
+// CARTERITA (desplegable de Deposit / Withdraw)
+// ==============================
+walletBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  walletMenu.classList.toggle("hidden");
+});
+document.addEventListener("click", (e) => {
+  if (!walletMenu.classList.contains("hidden") && !walletMenu.contains(e.target) && e.target !== walletBtn) {
+    walletMenu.classList.add("hidden");
+  }
+});
+walletDepositBtn.addEventListener("click", () => {
+  walletMenu.classList.add("hidden");
+  openDepositModal();
+});
+walletWithdrawBtn.addEventListener("click", () => {
+  walletMenu.classList.add("hidden");
+  openWithdrawModal();
+});
+
+// ==============================
+// DEPOSIT
+// ==============================
+function openDepositModal(){
+  if (!requireSession()) return;
+  depositFromAvatar.src = `https://mc-heads.net/avatar/${encodeURIComponent(state.username)}/48`;
+  depositFromName.textContent = state.username;
+  depositBotAvatar.src = `https://mc-heads.net/avatar/${BOT_IGN}/48`;
+  depositBotName.textContent = BOT_IGN;
+  depositAmount.value = "";
+  depositContinueBtn.disabled = true;
+  depositCommandBox.classList.add("hidden");
+  depositModal.classList.remove("hidden");
+}
+depositModalClose.addEventListener("click", () => depositModal.classList.add("hidden"));
+depositModal.addEventListener("click", (e) => { if (e.target === depositModal) depositModal.classList.add("hidden"); });
+
+depositAmount.addEventListener("input", () => {
+  depositContinueBtn.disabled = !(Math.floor(Number(depositAmount.value)) >= MIN_DEPOSIT);
+  depositCommandBox.classList.add("hidden");
+});
+document.querySelectorAll(".amount-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    depositAmount.value = chip.dataset.amount;
+    depositContinueBtn.disabled = false;
+    depositCommandBox.classList.add("hidden");
+  });
+});
+depositContinueBtn.addEventListener("click", () => {
+  const amt = Math.floor(Number(depositAmount.value));
+  if (!(amt >= MIN_DEPOSIT)) return;
+  depositPayCommand.textContent = `/pay ${BOT_IGN} ${amt}`;
+  depositCommandBox.classList.remove("hidden");
+});
+
+// ==============================
+// WITHDRAW
+// ==============================
+async function openWithdrawModal(){
+  if (!requireSession()) return;
+  withdrawBotAvatar.src = `https://mc-heads.net/avatar/${BOT_IGN}/48`;
+  withdrawBotName.textContent = BOT_IGN;
+  withdrawToAvatar.src = `https://mc-heads.net/avatar/${encodeURIComponent(state.username)}/48`;
+  withdrawToName.textContent = state.username;
+  withdrawAmount.value = "";
+  withdrawError.classList.add("hidden");
+  withdrawPendingNotice.classList.add("hidden");
+  withdrawRequestBtn.disabled = false;
+  withdrawModal.classList.remove("hidden");
+
+  try {
+    const data = await apiFetch(`/user/${encodeURIComponent(state.username)}`);
+    if (data.has_pending_withdrawal) {
+      withdrawPendingNotice.classList.remove("hidden");
+      withdrawRequestBtn.disabled = true;
+    }
+  } catch (e) { /* no bloquea el modal si falla la consulta */ }
+}
+withdrawModalClose.addEventListener("click", () => withdrawModal.classList.add("hidden"));
+withdrawModal.addEventListener("click", (e) => { if (e.target === withdrawModal) withdrawModal.classList.add("hidden"); });
+
+withdrawMaxBtn.addEventListener("click", () => {
+  withdrawAmount.value = Math.max(0, Math.floor(state.balance));
+});
+
+withdrawRequestBtn.addEventListener("click", async () => {
+  const amt = Math.floor(Number(withdrawAmount.value));
+  withdrawError.classList.add("hidden");
+  if (!(amt >= MIN_WITHDRAWAL)) {
+    withdrawError.textContent = t("withdraw.errorMin");
+    withdrawError.classList.remove("hidden");
+    return;
+  }
+  if (amt > state.balance) {
+    withdrawError.textContent = t("withdraw.errorBalance");
+    withdrawError.classList.remove("hidden");
+    return;
+  }
+  withdrawRequestBtn.disabled = true;
+  try {
+    const data = await apiFetch("/account/withdraw/request", {
+      method: "POST",
+      body: JSON.stringify({ minecraft_username: state.username, session_token: state.sessionToken, amount: amt }),
+    });
+    setBalance(data.balance);
+    showToast(t("withdraw.success"), { type: "info" });
+    withdrawModal.classList.add("hidden");
+  } catch (e) {
+    withdrawError.textContent = e.message;
+    withdrawError.classList.remove("hidden");
+    withdrawRequestBtn.disabled = false;
+  }
+});
 
 // ==============================
 // VISTA PREVIA DE LA SKIN DE MINECRAFT
@@ -264,6 +430,12 @@ const wonText = (m, p) => `${t("game.crash.wonPrefix")}${m.toFixed(2)}${t("game.
 
 function startBalanceLoop(){
   if (!state.balanceLoop) state.balanceLoop = setInterval(refreshBalance, 5000);
+}
+function stopBalanceLoop(){
+  if (state.balanceLoop) {
+    clearInterval(state.balanceLoop);
+    state.balanceLoop = null;
+  }
 }
 function setBalance(n){ state.balance = n; updateBalanceDisplay(); }
 
