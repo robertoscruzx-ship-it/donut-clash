@@ -49,10 +49,10 @@ app.post("/bet/coinflip", async (req, res) => {
       { $inc: { balance: -bet, nonce: 1 } },
       { returnDocument: "after" }
     );
-    if (!deduction.value) return res.status(400).json({ error: "Sesión inválida o saldo insuficiente." });
+    if (!deduction) return res.status(400).json({ error: "Sesión inválida o saldo insuficiente." });
     await adjustHouseReserve(bet);
 
-    const user = deduction.value;
+    const user = deduction;
     const nonce = user.nonce;
     const roll = fairFloat(user.server_seed, client_seed || "default", nonce);
 
@@ -113,10 +113,10 @@ app.post("/mines/start", async (req, res) => {
       { $inc: { balance: -bet, nonce: 1 } },
       { returnDocument: "after" }
     );
-    if (!deduction.value) return res.status(400).json({ error: "Sesión inválida o saldo insuficiente." });
+    if (!deduction) return res.status(400).json({ error: "Sesión inválida o saldo insuficiente." });
     await adjustHouseReserve(bet);
 
-    const user = deduction.value;
+    const user = deduction;
     const nonce = user.nonce;
     const shuffled = seededShuffle(user.server_seed, client_seed || "default", nonce, BOARD_SIZE);
     const bomb_positions = shuffled.slice(0, bombs).sort((a, b) => a - b);
@@ -229,10 +229,10 @@ app.post("/crash/start", async (req, res) => {
       { $inc: { balance: -bet, nonce: 1 } },
       { returnDocument: "after" }
     );
-    if (!deduction.value) return res.status(400).json({ error: "Sesión inválida o saldo insuficiente." });
+    if (!deduction) return res.status(400).json({ error: "Sesión inválida o saldo insuficiente." });
     await adjustHouseReserve(bet);
 
-    const user = deduction.value;
+    const user = deduction;
     const nonce = user.nonce;
     const roll = fairFloat(user.server_seed, client_seed || "default", nonce);
     const crash_point = exposure.forcedLoss ? 1.0 : crashPointFromRoll(roll, HOUSE_EDGE, CRASH_MAX_MULTIPLIER);

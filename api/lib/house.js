@@ -22,12 +22,14 @@ async function getHouseReserve() {
 async function adjustHouseReserve(delta) {
   await ensureHouseDoc(0);
   const house = await getHouseCollection();
+  // mongodb v6: findOneAndUpdate devuelve el documento directamente (ya no
+  // envuelto en { value }) salvo que pidamos includeResultMetadata.
   const result = await house.findOneAndUpdate(
     { _id: HOUSE_DOC_ID },
     { $inc: { reserve: delta } },
     { returnDocument: "after" }
   );
-  return result.value.reserve;
+  return result.reserve;
 }
 
 module.exports = { getHouseReserve, ensureHouseDoc, adjustHouseReserve, HOUSE_DOC_ID };

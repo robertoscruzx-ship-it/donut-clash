@@ -143,7 +143,7 @@ app.post("/deposit-donuts", requireApiKey, async (req, res) => {
       { $inc: { balance: depositAmount }, $set: { updated_at: new Date() } },
       { returnDocument: "after" }
     );
-    return res.status(200).json({ minecraft_username: username, balance: result.value.balance });
+    return res.status(200).json({ minecraft_username: username, balance: result.balance });
   } catch (err) {
     console.error("Error en /account/deposit-donuts:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
@@ -228,7 +228,7 @@ app.post("/withdraw/request", async (req, res) => {
       { $inc: { balance: -requestedAmount }, $set: { updated_at: new Date() } },
       { returnDocument: "after" }
     );
-    if (!result.value) {
+    if (!result) {
       return res.status(400).json({ error: "No tienes saldo suficiente." });
     }
 
@@ -240,7 +240,7 @@ app.post("/withdraw/request", async (req, res) => {
       created_at: new Date(),
     });
 
-    return res.status(200).json({ status: "pending", balance: result.value.balance });
+    return res.status(200).json({ status: "pending", balance: result.balance });
   } catch (err) {
     console.error("Error en /account/withdraw/request:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
@@ -277,11 +277,11 @@ app.post("/withdraw/next", requireApiKey, async (req, res) => {
       { sort: { created_at: 1 }, returnDocument: "after" }
     );
 
-    if (!candidate.value) {
+    if (!candidate) {
       return res.status(200).json({ withdrawal: null });
     }
 
-    const w = candidate.value;
+    const w = candidate;
     return res.status(200).json({
       withdrawal: {
         withdrawal_id: String(w._id),
