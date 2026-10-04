@@ -1,22 +1,9 @@
 const express = require("express");
-const { getBetsCollection } = require("../../lib/db");
-const { getHouseReserve } = require("../../lib/house");
-const { cors } = require("../../lib/cors");
-const { requireAdminPanelAuth } = require("../../lib/auth");
+const { getBetsCollection } = require("../db");
+const { getHouseReserve } = require("../house");
+const { requireAdminPanelAuth } = require("../auth");
 
-const app = express();
-
-// Catch-all (mismo patrón que account/[...path].js y games/[...path].js):
-// Vercel parece tener un conflicto de enrutamiento cuando un archivo
-// "plano" (sin corchetes) convive con archivos catch-all en el mismo
-// proyecto. Convertirlo también a catch-all lo hace consistente y evita
-// ese problema.
-app.use((req, res, next) => {
-  req.url = req.url.replace(/^\/api\/admin/, "") || "/";
-  next();
-});
-app.use(express.json());
-app.use(cors);
+const router = express.Router();
 
 /**
  * POST /api/admin/stats
@@ -28,7 +15,7 @@ app.use(cors);
  * mostrar los números reales de la sesión (total apostado, pagado, margen
  * real, cuántas fueron pérdida forzada, etc.).
  */
-app.post("/stats", requireAdminPanelAuth, async (req, res) => {
+router.post("/stats", requireAdminPanelAuth, async (req, res) => {
   try {
     const bets = await getBetsCollection();
 
@@ -84,4 +71,4 @@ app.post("/stats", requireAdminPanelAuth, async (req, res) => {
   }
 });
 
-module.exports = app;
+module.exports = router;

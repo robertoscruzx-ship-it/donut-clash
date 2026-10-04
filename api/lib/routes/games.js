@@ -1,27 +1,16 @@
 const express = require("express");
 const { ObjectId } = require("mongodb");
-const { getUsersCollection, getMinesGamesCollection, getCrashGamesCollection } = require("../../lib/db");
-const { cors } = require("../../lib/cors");
-const { getUserBySession } = require("../../lib/session");
-const { fairFloat, seededShuffle } = require("../../lib/fairness");
-const { HOUSE_EDGE, CRASH_MAX_MULTIPLIER } = require("../../lib/houseEdge");
-const { evaluateExposure } = require("../../lib/bankroll");
-const { adjustHouseReserve } = require("../../lib/house");
-const { logBet } = require("../../lib/betlog");
-const { BOARD_SIZE, payoutMultiplier } = require("../../lib/mines");
-const { GROWTH_RATE, crashPointFromRoll, multiplierAtTime } = require("../../lib/crash");
+const { getUsersCollection, getMinesGamesCollection, getCrashGamesCollection } = require("../db");
+const { getUserBySession } = require("../session");
+const { fairFloat, seededShuffle } = require("../fairness");
+const { HOUSE_EDGE, CRASH_MAX_MULTIPLIER } = require("../houseEdge");
+const { evaluateExposure } = require("../bankroll");
+const { adjustHouseReserve } = require("../house");
+const { logBet } = require("../betlog");
+const { BOARD_SIZE, payoutMultiplier } = require("../mines");
+const { GROWTH_RATE, crashPointFromRoll, multiplierAtTime } = require("../crash");
 
-const app = express();
-
-// Catch-all: agrupa Coinflip, Mines y Crash en UNA sola función de Vercel
-// (igual que account/[...path].js) para no pasarnos del límite de 12
-// funciones del plan gratuito.
-app.use((req, res, next) => {
-  req.url = req.url.replace(/^\/api\/games/, "") || "/";
-  next();
-});
-app.use(express.json());
-app.use(cors);
+const router = express.Router();
 
 const FAIR_WIN_PROBABILITY = 0.5;
 const COINFLIP_PAYOUT_MULTIPLIER = 2 * (1 - HOUSE_EDGE);
@@ -30,7 +19,7 @@ const COINFLIP_PAYOUT_MULTIPLIER = 2 * (1 - HOUSE_EDGE);
  * POST /api/games/bet/coinflip
  * Body: { minecraft_username, session_token, bet_amount, choice, client_seed }
  */
-app.post("/bet/coinflip", async (req, res) => {
+router.post("/bet/coinflip", async (req, res) => {
   try {
     const { minecraft_username, session_token, bet_amount, choice, client_seed } = req.body || {};
     if (!minecraft_username || !session_token || !choice) {
@@ -88,7 +77,7 @@ app.post("/bet/coinflip", async (req, res) => {
  * POST /api/games/mines/start
  * Body: { minecraft_username, session_token, bet_amount, bombs_count, client_seed }
  */
-app.post("/mines/start", async (req, res) => {
+router.post("/mines/start", async (req, res) => {
   try {
     const { minecraft_username, session_token, bet_amount, bombs_count, client_seed } = req.body || {};
     const bet = Number(bet_amount);
@@ -140,7 +129,7 @@ app.post("/mines/start", async (req, res) => {
  * POST /api/games/mines/reveal
  * Body: { minecraft_username, session_token, game_id, tile_index }
  */
-app.post("/mines/reveal", async (req, res) => {
+router.post("/mines/reveal", async (req, res) => {
   try {
     const { minecraft_username, session_token, game_id, tile_index } = req.body || {};
     const tile = Number(tile_index);
@@ -179,7 +168,7 @@ app.post("/mines/reveal", async (req, res) => {
  * POST /api/games/mines/cashout
  * Body: { minecraft_username, session_token, game_id }
  */
-app.post("/mines/cashout", async (req, res) => {
+router.post("/mines/cashout", async (req, res) => {
   try {
     const { minecraft_username, session_token, game_id } = req.body || {};
     const user = await getUserBySession(minecraft_username, session_token);
@@ -211,7 +200,7 @@ app.post("/mines/cashout", async (req, res) => {
  * POST /api/games/crash/start
  * Body: { minecraft_username, session_token, bet_amount, client_seed }
  */
-app.post("/crash/start", async (req, res) => {
+router.post("/crash/start", async (req, res) => {
   try {
     const { minecraft_username, session_token, bet_amount, client_seed } = req.body || {};
     const bet = Number(bet_amount);
@@ -257,7 +246,7 @@ app.post("/crash/start", async (req, res) => {
  * POST /api/games/crash/cashout
  * Body: { minecraft_username, session_token, game_id }
  */
-app.post("/crash/cashout", async (req, res) => {
+router.post("/crash/cashout", async (req, res) => {
   try {
     const { minecraft_username, session_token, game_id } = req.body || {};
     const user = await getUserBySession(minecraft_username, session_token);
@@ -293,4 +282,4 @@ app.post("/crash/cashout", async (req, res) => {
   }
 });
 
-module.exports = app;
+module.exports = router;

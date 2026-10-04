@@ -1,31 +1,18 @@
 const express = require("express");
 const crypto = require("crypto");
 const { ObjectId } = require("mongodb");
-const { getUsersCollection, getWithdrawalsCollection } = require("../../lib/db");
-const { cors } = require("../../lib/cors");
-const { requireApiKey } = require("../../lib/auth");
-const { getUserBySession } = require("../../lib/session");
-const { randomServerSeed, hashServerSeed } = require("../../lib/fairness");
+const { getUsersCollection, getWithdrawalsCollection } = require("../db");
+const { requireApiKey } = require("../auth");
+const { getUserBySession } = require("../session");
+const { randomServerSeed, hashServerSeed } = require("../fairness");
 
-const app = express();
-
-// Este archivo es una función "catch-all" de Vercel: agrupa varios
-// endpoints pequeños en UNA sola función para no pasarnos del límite de
-// 12 funciones del plan gratuito. Vercel reenvía la ruta COMPLETA
-// (ej. "/api/account/generate-code"), así que quitamos el prefijo fijo
-// antes de que Express intente hacer el match de rutas.
-app.use((req, res, next) => {
-  req.url = req.url.replace(/^\/api\/account/, "") || "/";
-  next();
-});
-app.use(express.json());
-app.use(cors);
+const router = express.Router();
 
 /**
  * POST /api/account/generate-code
  * Body: { minecraft_username }
  */
-app.post("/generate-code", async (req, res) => {
+router.post("/generate-code", async (req, res) => {
   try {
     const { minecraft_username } = req.body || {};
     if (!minecraft_username || typeof minecraft_username !== "string") {
@@ -57,7 +44,7 @@ app.post("/generate-code", async (req, res) => {
  * Body: { minecraft_username, payment_amount, api_key }
  * Protegido por api_key (lo llama el bot, no el frontend).
  */
-app.post("/verify-link", requireApiKey, async (req, res) => {
+router.post("/verify-link", requireApiKey, async (req, res) => {
   try {
     const { minecraft_username, payment_amount } = req.body || {};
     if (!minecraft_username || payment_amount === undefined) {
@@ -89,7 +76,7 @@ app.post("/verify-link", requireApiKey, async (req, res) => {
  * POST /api/account/claim-session
  * Body: { minecraft_username }
  */
-app.post("/claim-session", async (req, res) => {
+router.post("/claim-session", async (req, res) => {
   try {
     const { minecraft_username } = req.body || {};
     if (!minecraft_username) return res.status(400).json({ error: "minecraft_username es requerido." });
@@ -121,7 +108,7 @@ app.post("/claim-session", async (req, res) => {
  * Body: { minecraft_username, amount, api_key }
  * Protegido por api_key (lo llama el bot, no el frontend).
  */
-app.post("/deposit-donuts", requireApiKey, async (req, res) => {
+router.post("/deposit-donuts", requireApiKey, async (req, res) => {
   try {
     const { minecraft_username, amount } = req.body || {};
     if (!minecraft_username || amount === undefined) {
@@ -154,7 +141,7 @@ app.post("/deposit-donuts", requireApiKey, async (req, res) => {
  * POST /api/account/fairness/reveal
  * Body: { minecraft_username, session_token }
  */
-app.post("/fairness/reveal", async (req, res) => {
+router.post("/fairness/reveal", async (req, res) => {
   try {
     const { minecraft_username, session_token } = req.body || {};
     const user = await getUserBySession(minecraft_username, session_token);
@@ -188,14 +175,10 @@ app.post("/fairness/reveal", async (req, res) => {
  * Valida monto > 0, <= saldo, >= mínimo, y que no haya ya un retiro
  * pendiente para ese usuario. Descuenta el saldo de inmediato (para que
  * no se pueda gastar mientras está en cola) y encola la solicitud.
- *
- * NOTA: esto solo registra la solicitud. El pago real en el juego (el bot
- * detectando y ejecutando el pago de salida) todavía no está implementado
- * — es el siguiente paso pendiente del proyecto.
  */
 const MIN_WITHDRAWAL = 10000;
 
-app.post("/withdraw/request", async (req, res) => {
+router.post("/withdraw/request", async (req, res) => {
   try {
     const { minecraft_username, session_token, amount } = req.body || {};
     const user = await getUserBySession(minecraft_username, session_token);
@@ -222,7 +205,6 @@ app.post("/withdraw/request", async (req, res) => {
     }
 
     const users = await getUsersCollection();
-    // $gte evita condiciones de carrera: solo descuenta si el saldo sigue alcanzando.
     const result = await users.findOneAndUpdate(
       { minecraft_username: user.minecraft_username, balance: { $gte: requestedAmount } },
       { $inc: { balance: -requestedAmount }, $set: { updated_at: new Date() } },
@@ -254,13 +236,8 @@ const WITHDRAW_COOLDOWN_MS = 60 * 1000; // 1 minuto entre intentos
  * POST /api/account/withdraw/next
  * Body: { api_key }
  * Protegido por api_key (lo llama el bot cada ~15s).
- *
- * Devuelve el retiro más antiguo (FIFO) que esté "pending" y cuyo
- * cooldown ya haya pasado (o que nunca se haya intentado). Al entregarlo
- * lo marca como "in_progress" y suma un intento, para que no se lo
- * entreguemos dos veces mientras el bot lo está procesando.
  */
-app.post("/withdraw/next", requireApiKey, async (req, res) => {
+router.post("/withdraw/next", requireApiKey, async (req, res) => {
   try {
     const withdrawals = await getWithdrawalsCollection();
     const cutoff = new Date(Date.now() - WITHDRAW_COOLDOWN_MS);
@@ -300,13 +277,8 @@ app.post("/withdraw/next", requireApiKey, async (req, res) => {
  * POST /api/account/withdraw/confirm
  * Body: { api_key, withdrawal_id, success }
  * Protegido por api_key (lo llama el bot tras intentar el pago en el juego).
- *
- * Si success=true: marca el retiro como completado.
- * Si success=false: si ya se agotaron los intentos, cancela el retiro y
- * devuelve el saldo al jugador; si no, lo deja "pending" de nuevo para
- * que /withdraw/next lo vuelva a entregar tras el cooldown.
  */
-app.post("/withdraw/confirm", requireApiKey, async (req, res) => {
+router.post("/withdraw/confirm", requireApiKey, async (req, res) => {
   try {
     const { withdrawal_id, success } = req.body || {};
     if (!withdrawal_id) return res.status(400).json({ error: "withdrawal_id es requerido." });
@@ -347,4 +319,4 @@ app.post("/withdraw/confirm", requireApiKey, async (req, res) => {
   }
 });
 
-module.exports = app;
+module.exports = router;

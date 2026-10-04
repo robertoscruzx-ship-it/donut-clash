@@ -1,24 +1,16 @@
 const express = require("express");
-const { getUsersCollection, getWithdrawalsCollection } = require("../../lib/db");
-const { cors } = require("../../lib/cors");
+const { getUsersCollection, getWithdrawalsCollection } = require("../db");
 
-const app = express();
-app.use(express.json());
-app.use(cors);
+const router = express.Router();
 
 /**
  * GET /api/user/:username
  * Devuelve los datos públicos de un usuario: saldo y estado.
  * (No expone pending_code ni ningún dato sensible.)
  */
-app.get("*", async (req, res) => {
+router.get("/:username", async (req, res) => {
   try {
-    // Según cómo Vercel reenvíe la petición, el username puede venir en
-    // req.query.username (convención clásica de rutas dinámicas) o como
-    // el último segmento de la ruta completa (ej. "/api/user/steve").
-    const pathSegments = req.path.split("/").filter(Boolean);
-    const pathUsername = pathSegments[pathSegments.length - 1] || "";
-    const username = String(req.query.username || pathUsername || "").trim();
+    const username = String(req.params.username || "").trim();
 
     if (!username) {
       return res.status(400).json({ error: "username es requerido." });
@@ -49,4 +41,4 @@ app.get("*", async (req, res) => {
   }
 });
 
-module.exports = app;
+module.exports = router;
