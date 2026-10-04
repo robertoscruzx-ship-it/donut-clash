@@ -6,6 +6,24 @@ const BOT_IGN = "rCrux"; // nombre real del bot dentro de Minecraft
 const MIN_DEPOSIT = 10000;
 const MIN_WITHDRAWAL = 10000;
 
+// Convierte texto como "10k", "2.5M", "1B" (o un número normal) a donuts.
+// Acepta mayúsculas/minúsculas y un punto decimal opcional antes del
+// sufijo. Devuelve NaN si el texto no se puede interpretar, igual que
+// Number() haría con cualquier otro texto inválido.
+function parseShorthandAmount(raw) {
+  const text = String(raw || "").trim();
+  if (!text) return NaN;
+  const match = text.match(/^([0-9]+(?:\.[0-9]+)?)\s*([kKmMbB])?$/);
+  if (!match) return NaN;
+  const value = Number(match[1]);
+  if (!Number.isFinite(value)) return NaN;
+  const suffix = (match[2] || "").toLowerCase();
+  if (suffix === "k") return value * 1000;
+  if (suffix === "m") return value * 1000000;
+  if (suffix === "b") return value * 1000000000;
+  return value;
+}
+
 // ==============================
 // ESTADO GLOBAL
 // ==============================
@@ -220,7 +238,7 @@ depositModalClose.addEventListener("click", () => depositModal.classList.add("hi
 depositModal.addEventListener("click", (e) => { if (e.target === depositModal) depositModal.classList.add("hidden"); });
 
 depositAmount.addEventListener("input", () => {
-  depositContinueBtn.disabled = !(Math.floor(Number(depositAmount.value)) >= MIN_DEPOSIT);
+  depositContinueBtn.disabled = !(Math.floor(parseShorthandAmount(depositAmount.value)) >= MIN_DEPOSIT);
   depositCommandBox.classList.add("hidden");
 });
 document.querySelectorAll(".amount-chip").forEach((chip) => {
@@ -231,7 +249,7 @@ document.querySelectorAll(".amount-chip").forEach((chip) => {
   });
 });
 depositContinueBtn.addEventListener("click", () => {
-  const amt = Math.floor(Number(depositAmount.value));
+  const amt = Math.floor(parseShorthandAmount(depositAmount.value));
   if (!(amt >= MIN_DEPOSIT)) return;
   depositPayCommand.textContent = `/pay ${BOT_IGN} ${amt}`;
   depositCommandBox.classList.remove("hidden");
@@ -268,7 +286,7 @@ withdrawMaxBtn.addEventListener("click", () => {
 });
 
 withdrawRequestBtn.addEventListener("click", async () => {
-  const amt = Math.floor(Number(withdrawAmount.value));
+  const amt = Math.floor(parseShorthandAmount(withdrawAmount.value));
   withdrawError.classList.add("hidden");
   if (!(amt >= MIN_WITHDRAWAL)) {
     withdrawError.textContent = t("withdraw.errorMin");
