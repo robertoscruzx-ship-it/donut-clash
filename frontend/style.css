@@ -286,6 +286,22 @@ body{
 
 .error{color:var(--danger); font-weight:600; margin-top:12px;}
 
+/* ===== SKIN PREVIEW (al escribir el username de Minecraft) ===== */
+.skin-preview{
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  margin:4px 0 16px 0;
+  animation:skinFadeIn .2s ease-out;
+}
+.skin-preview img{
+  width:72px; height:72px;
+  image-rendering:pixelated;
+  background:#000;
+  border:2px solid var(--border);
+  border-radius:10px;
+}
+.skin-preview-name{font-weight:700; font-size:0.9rem; color:var(--text);}
+@keyframes skinFadeIn{from{opacity:0; transform:translateY(-4px);} to{opacity:1; transform:translateY(0);}}
+
 .footer{padding:16px; text-align:center; border-top:1px solid var(--border-soft);}
 
 @media (max-width: 720px){

@@ -47,6 +47,9 @@ const generateBtn = document.getElementById("generateBtn");
 const cancelLinkBtn = document.getElementById("cancelLinkBtn");
 const payCommand = document.getElementById("payCommand");
 const linkError = document.getElementById("linkError");
+const skinPreview = document.getElementById("skinPreview");
+const skinPreviewImg = document.getElementById("skinPreviewImg");
+const skinPreviewName = document.getElementById("skinPreviewName");
 
 const homeView = document.getElementById("homeView");
 const gameView = document.getElementById("gameView");
@@ -99,6 +102,8 @@ function openModal(){
 }
 function closeModal(){
   authModal.classList.add("hidden");
+  mcUsername.value = "";
+  hideSkinPreview();
 }
 
 signInBtn.addEventListener("click", openModal);
@@ -106,6 +111,36 @@ registerBtn.addEventListener("click", openModal);
 modalClose.addEventListener("click", closeModal);
 modalAlreadyCloseBtn.addEventListener("click", closeModal);
 authModal.addEventListener("click", (e) => { if (e.target === authModal) closeModal(); });
+
+// ==============================
+// VISTA PREVIA DE LA SKIN DE MINECRAFT
+// (solo cosmético: no verifica que la cuenta exista ni que sea del jugador,
+// simplemente consulta un servicio público de skins por nombre de usuario)
+// ==============================
+let skinPreviewTimer = null;
+
+function hideSkinPreview(){
+  skinPreview.classList.add("hidden");
+  skinPreviewImg.src = "";
+}
+
+function showSkinPreview(username){
+  skinPreviewImg.src = `https://mc-heads.net/avatar/${encodeURIComponent(username)}/96`;
+  skinPreviewName.textContent = username;
+  skinPreview.classList.remove("hidden");
+}
+
+mcUsername.addEventListener("input", () => {
+  clearTimeout(skinPreviewTimer);
+  const username = mcUsername.value.trim();
+  if (username.length < 3) {
+    hideSkinPreview();
+    return;
+  }
+  skinPreviewTimer = setTimeout(() => showSkinPreview(username), 350);
+});
+
+skinPreviewImg.addEventListener("error", hideSkinPreview);
 
 // ==============================
 // PASO 1: GENERAR CÓDIGO

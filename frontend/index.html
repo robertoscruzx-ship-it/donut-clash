@@ -110,7 +110,13 @@
       <div id="modalStep1">
         <h2 data-i18n="modal.title">Link your Minecraft account</h2>
         <p class="muted small" data-i18n="modal.subtitle">Enter your Minecraft username to generate a verification code.</p>
-        <input id="mcUsername" type="text" data-i18n-placeholder="modal.usernamePlaceholder" placeholder="Your Minecraft username" maxlength="16">
+        <input id="mcUsername" type="text" data-i18n-placeholder="modal.usernamePlaceholder" placeholder="Your Minecraft username" maxlength="16" autocomplete="off">
+
+        <div id="skinPreview" class="skin-preview hidden">
+          <img id="skinPreviewImg" alt="Minecraft skin preview">
+          <span id="skinPreviewName" class="skin-preview-name"></span>
+        </div>
+
         <button id="generateBtn" class="btn-primary" data-i18n="modal.generateBtn">Generate code</button>
         <p id="linkError" class="error hidden"></p>
       </div>
