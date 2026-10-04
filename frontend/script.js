@@ -2,6 +2,7 @@
 // CONFIGURACIÓN
 // ==============================
 const API_BASE_URL = "https://donut-clash-rho.vercel.app/api";
+const BOT_IGN = "rCrux"; // nombre real del bot dentro de Minecraft
 
 // ==============================
 // ESTADO GLOBAL
@@ -163,7 +164,7 @@ generateBtn.addEventListener("click", async () => {
     });
 
     state.username = username;
-    payCommand.textContent = `/pay Donaciones ${data.code}`;
+    payCommand.textContent = `/pay ${BOT_IGN} ${data.code}`;
 
     modalStep1.classList.add("hidden");
     modalStep2.classList.remove("hidden");
