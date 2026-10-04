@@ -94,6 +94,7 @@ const I18N = {
     "account.active": "Active",
     "account.balance": "BALANCE",
     "account.logout": "Log out",
+    "account.xp": "XP",
   },
   es: {
     "nav.signIn": "Iniciar sesión",
@@ -188,6 +189,7 @@ const I18N = {
     "account.active": "Activa",
     "account.balance": "SALDO",
     "account.logout": "Cerrar sesión",
+    "account.xp": "XP",
   },
   pt: {
     "nav.signIn": "Entrar",
@@ -282,6 +284,7 @@ const I18N = {
     "account.active": "Ativa",
     "account.balance": "SALDO",
     "account.logout": "Sair",
+    "account.xp": "XP",
   },
   fr: {
     "nav.signIn": "Connexion",
@@ -376,6 +379,7 @@ const I18N = {
     "account.active": "Actif",
     "account.balance": "SOLDE",
     "account.logout": "Déconnexion",
+    "account.xp": "XP",
   },
 };
 

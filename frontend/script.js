@@ -53,6 +53,9 @@ const state = {
   sessionToken: null,
   clientSeed: null,
   balance: 0,
+  level: 1,
+  xpIntoLevel: 0,
+  xpForNextLevel: 52,
   pollingInterval: null,
   view: "home",
   roundActive: false,
@@ -99,6 +102,10 @@ const accountAvatarImg = document.getElementById("accountAvatarImg");
 const accountUsername = document.getElementById("accountUsername");
 const accountBalanceValue = document.getElementById("accountBalanceValue");
 const logoutBtn = document.getElementById("logoutBtn");
+const accountLevelValue = document.getElementById("accountLevelValue");
+const accountXpInto = document.getElementById("accountXpInto");
+const accountXpNext = document.getElementById("accountXpNext");
+const accountXpFill = document.getElementById("accountXpFill");
 
 const mcUsername = document.getElementById("mcUsername");
 const generateBtn = document.getElementById("generateBtn");
@@ -164,6 +171,17 @@ function updateBalanceDisplay(){
   if (walletBalanceValue) walletBalanceValue.textContent = state.balance;
 }
 
+// Refleja state.level / xpIntoLevel / xpForNextLevel en la barra de XP del
+// modal de cuenta (la única pantalla que la muestra por ahora).
+function updateXpDisplay(){
+  if (!accountLevelValue) return;
+  accountLevelValue.textContent = state.level;
+  accountXpInto.textContent = state.xpIntoLevel;
+  accountXpNext.textContent = state.xpForNextLevel;
+  const pct = state.xpForNextLevel > 0 ? Math.min(100, (state.xpIntoLevel / state.xpForNextLevel) * 100) : 0;
+  accountXpFill.style.width = `${pct}%`;
+}
+
 // Cambia Sign In / Register por la cabeza de Minecraft del jugador
 // en cuanto hay una sesión vinculada, y muestra/oculta la carterita.
 function updateAuthUI(){
@@ -192,6 +210,8 @@ function openModal(){
     accountAvatarImg.src = `https://mc-heads.net/avatar/${encodeURIComponent(state.username)}/48`;
     accountUsername.textContent = state.username;
     accountBalanceValue.textContent = state.balance;
+    updateXpDisplay();
+    refreshBalance(); // trae el XP más reciente por si pasó algo desde el último poll
   } else {
     modalAlreadyLinked.classList.add("hidden");
     modalStep2.classList.add("hidden");
@@ -453,7 +473,13 @@ async function refreshBalance(){
   try {
     const data = await apiFetch(`/user-${encodeURIComponent(state.username)}`);
     state.balance = data.balance;
+    if (typeof data.level === "number") {
+      state.level = data.level;
+      state.xpIntoLevel = data.xp_into_level;
+      state.xpForNextLevel = data.xp_for_next_level;
+    }
     updateBalanceDisplay();
+    updateXpDisplay();
   } catch (err) {
     console.error("Could not refresh balance:", err.message);
   }

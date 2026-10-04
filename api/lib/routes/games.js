@@ -7,6 +7,7 @@ const { HOUSE_EDGE, CRASH_MAX_MULTIPLIER } = require("../houseEdge");
 const { evaluateExposure } = require("../bankroll");
 const { adjustHouseReserve } = require("../house");
 const { logBet } = require("../betlog");
+const { xpForBet } = require("../xp");
 const { BOARD_SIZE, payoutMultiplier } = require("../mines");
 const { GROWTH_RATE, crashPointFromRoll, multiplierAtTime } = require("../crash");
 
@@ -35,7 +36,7 @@ router.post("/games-bet-coinflip", async (req, res) => {
     const users = await getUsersCollection();
     const deduction = await users.findOneAndUpdate(
       { minecraft_username, session_token, balance: { $gte: bet } },
-      { $inc: { balance: -bet, nonce: 1 } },
+      { $inc: { balance: -bet, nonce: 1, xp: xpForBet(bet) } },
       { returnDocument: "after" }
     );
     if (!deduction) return res.status(400).json({ error: "Sesión inválida o saldo insuficiente." });
@@ -99,7 +100,7 @@ router.post("/games-mines-start", async (req, res) => {
 
     const deduction = await users.findOneAndUpdate(
       { minecraft_username, session_token, balance: { $gte: bet } },
-      { $inc: { balance: -bet, nonce: 1 } },
+      { $inc: { balance: -bet, nonce: 1, xp: xpForBet(bet) } },
       { returnDocument: "after" }
     );
     if (!deduction) return res.status(400).json({ error: "Sesión inválida o saldo insuficiente." });
@@ -215,7 +216,7 @@ router.post("/games-crash-start", async (req, res) => {
 
     const deduction = await users.findOneAndUpdate(
       { minecraft_username, session_token, balance: { $gte: bet } },
-      { $inc: { balance: -bet, nonce: 1 } },
+      { $inc: { balance: -bet, nonce: 1, xp: xpForBet(bet) } },
       { returnDocument: "after" }
     );
     if (!deduction) return res.status(400).json({ error: "Sesión inválida o saldo insuficiente." });

@@ -1,5 +1,6 @@
 const express = require("express");
 const { getUsersCollection, getWithdrawalsCollection } = require("../db");
+const { levelInfo } = require("../xp");
 
 const router = express.Router();
 
@@ -29,11 +30,16 @@ router.get("/user-:username", async (req, res) => {
       status: { $in: ["pending", "in_progress"] },
     });
 
+    const { level, xp_into_level, xp_for_next_level } = levelInfo(user.xp || 0);
+
     return res.status(200).json({
       minecraft_username: user.minecraft_username,
       status: user.status,
       balance: user.balance || 0,
       has_pending_withdrawal: !!pendingWithdrawal,
+      level,
+      xp_into_level,
+      xp_for_next_level,
     });
   } catch (err) {
     console.error("Error en /user/:username:", err);
