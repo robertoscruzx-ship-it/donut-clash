@@ -1,8 +1,8 @@
 {
   "rewrites": [
-    { "source": "/api/account/:match*", "destination": "/api/account" },
-    { "source": "/api/games/:match*", "destination": "/api/games" },
-    { "source": "/api/admin/:match*", "destination": "/api/admin" },
+    { "source": "/api/account/:match*", "destination": "/api/account/:match*" },
+    { "source": "/api/games/:match*", "destination": "/api/games/:match*" },
+    { "source": "/api/admin/:match*", "destination": "/api/admin/:match*" },
     { "source": "/(.*)", "destination": "/frontend/index.html" }
   ]
 }
