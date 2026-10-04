@@ -34,7 +34,7 @@ app.get("*", async (req, res) => {
     const withdrawals = await getWithdrawalsCollection();
     const pendingWithdrawal = await withdrawals.findOne({
       minecraft_username: user.minecraft_username,
-      status: "pending",
+      status: { $in: ["pending", "in_progress"] },
     });
 
     return res.status(200).json({

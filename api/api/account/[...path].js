@@ -215,7 +215,7 @@ app.post("/withdraw/request", async (req, res) => {
     const withdrawals = await getWithdrawalsCollection();
     const existingPending = await withdrawals.findOne({
       minecraft_username: user.minecraft_username,
-      status: "pending",
+      status: { $in: ["pending", "in_progress"] },
     });
     if (existingPending) {
       return res.status(409).json({ error: "Ya tienes un retiro pendiente. Espera a que se complete." });
@@ -243,6 +243,106 @@ app.post("/withdraw/request", async (req, res) => {
     return res.status(200).json({ status: "pending", balance: result.value.balance });
   } catch (err) {
     console.error("Error en /account/withdraw/request:", err);
+    return res.status(500).json({ error: "Error interno del servidor." });
+  }
+});
+
+const WITHDRAW_MAX_ATTEMPTS = 2;
+const WITHDRAW_COOLDOWN_MS = 60 * 1000; // 1 minuto entre intentos
+
+/**
+ * POST /api/account/withdraw/next
+ * Body: { api_key }
+ * Protegido por api_key (lo llama el bot cada ~15s).
+ *
+ * Devuelve el retiro más antiguo (FIFO) que esté "pending" y cuyo
+ * cooldown ya haya pasado (o que nunca se haya intentado). Al entregarlo
+ * lo marca como "in_progress" y suma un intento, para que no se lo
+ * entreguemos dos veces mientras el bot lo está procesando.
+ */
+app.post("/withdraw/next", requireApiKey, async (req, res) => {
+  try {
+    const withdrawals = await getWithdrawalsCollection();
+    const cutoff = new Date(Date.now() - WITHDRAW_COOLDOWN_MS);
+
+    const candidate = await withdrawals.findOneAndUpdate(
+      {
+        status: "pending",
+        $or: [{ last_attempt_at: { $exists: false } }, { last_attempt_at: { $lte: cutoff } }],
+      },
+      {
+        $set: { status: "in_progress", last_attempt_at: new Date() },
+        $inc: { attempts: 1 },
+      },
+      { sort: { created_at: 1 }, returnDocument: "after" }
+    );
+
+    if (!candidate.value) {
+      return res.status(200).json({ withdrawal: null });
+    }
+
+    const w = candidate.value;
+    return res.status(200).json({
+      withdrawal: {
+        withdrawal_id: String(w._id),
+        minecraft_username: w.minecraft_username,
+        amount: w.amount,
+        attempt: w.attempts,
+      },
+    });
+  } catch (err) {
+    console.error("Error en /account/withdraw/next:", err);
+    return res.status(500).json({ error: "Error interno del servidor." });
+  }
+});
+
+/**
+ * POST /api/account/withdraw/confirm
+ * Body: { api_key, withdrawal_id, success }
+ * Protegido por api_key (lo llama el bot tras intentar el pago en el juego).
+ *
+ * Si success=true: marca el retiro como completado.
+ * Si success=false: si ya se agotaron los intentos, cancela el retiro y
+ * devuelve el saldo al jugador; si no, lo deja "pending" de nuevo para
+ * que /withdraw/next lo vuelva a entregar tras el cooldown.
+ */
+app.post("/withdraw/confirm", requireApiKey, async (req, res) => {
+  try {
+    const { withdrawal_id, success } = req.body || {};
+    if (!withdrawal_id) return res.status(400).json({ error: "withdrawal_id es requerido." });
+
+    const withdrawals = await getWithdrawalsCollection();
+    const withdrawal = await withdrawals.findOne({ _id: new ObjectId(withdrawal_id) });
+    if (!withdrawal) return res.status(404).json({ error: "Retiro no encontrado." });
+    if (withdrawal.status !== "in_progress") {
+      return res.status(409).json({ error: `El retiro ya no está en progreso (status: ${withdrawal.status}).` });
+    }
+
+    if (success) {
+      await withdrawals.updateOne(
+        { _id: withdrawal._id },
+        { $set: { status: "completed", completed_at: new Date() } }
+      );
+      return res.status(200).json({ status: "completed" });
+    }
+
+    if (withdrawal.attempts >= WITHDRAW_MAX_ATTEMPTS) {
+      const users = await getUsersCollection();
+      await users.updateOne(
+        { minecraft_username: withdrawal.minecraft_username },
+        { $inc: { balance: withdrawal.amount }, $set: { updated_at: new Date() } }
+      );
+      await withdrawals.updateOne(
+        { _id: withdrawal._id },
+        { $set: { status: "failed", failed_at: new Date() } }
+      );
+      return res.status(200).json({ status: "failed", balance_restored: true });
+    }
+
+    await withdrawals.updateOne({ _id: withdrawal._id }, { $set: { status: "pending" } });
+    return res.status(200).json({ status: "pending_retry" });
+  } catch (err) {
+    console.error("Error en /account/withdraw/confirm:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
