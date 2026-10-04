@@ -5,8 +5,31 @@ const { getUsersCollection, getWithdrawalsCollection } = require("../db");
 const { requireApiKey } = require("../auth");
 const { getUserBySession } = require("../session");
 const { randomServerSeed, hashServerSeed } = require("../fairness");
+const { reportBotBalance } = require("../house");
 
 const router = express.Router();
+
+/**
+ * POST /api/account-bot-balance-sync
+ * Body: { api_key, balance }
+ * Protegido por api_key (lo llama el bot cada ~15 min con su saldo real
+ * leído del juego). Alimenta la tercera variable de reserva (ver
+ * bankroll.js) — la única que realmente decide si se fuerza una pérdida.
+ */
+router.post("/account-bot-balance-sync", requireApiKey, async (req, res) => {
+  try {
+    const { balance } = req.body || {};
+    const parsedBalance = Number(balance);
+    if (!Number.isFinite(parsedBalance) || parsedBalance < 0) {
+      return res.status(400).json({ error: "balance debe ser un número no negativo." });
+    }
+    await reportBotBalance(parsedBalance);
+    return res.status(200).json({ status: "ok", balance: parsedBalance });
+  } catch (err) {
+    console.error("Error en /account-bot-balance-sync:", err);
+    return res.status(500).json({ error: "Error interno del servidor." });
+  }
+});
 
 // NOTA IMPORTANTE: Vercel, en este proyecto, solo invoca la función
 // catch-all cuando la ruta tiene EXACTAMENTE un segmento después de

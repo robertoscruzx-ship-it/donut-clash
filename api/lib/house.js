@@ -32,4 +32,35 @@ async function adjustHouseReserve(delta) {
   return result.reserve;
 }
 
-module.exports = { getHouseReserve, ensureHouseDoc, adjustHouseReserve, HOUSE_DOC_ID };
+/**
+ * Saldo REAL del bot reportado por él mismo cada ~15 min (leyendo su
+ * propio /balance en el juego). Esta es la tercera variable de reserva:
+ * la única que de verdad decide si se fuerza una pérdida (ver
+ * bankroll.js). Las otras dos (reserve de arriba, y el total repartido
+ * entre jugadores) son solo para estadísticas/verificación cruzada.
+ */
+async function getBotRealBalance() {
+  await ensureHouseDoc(0);
+  const house = await getHouseCollection();
+  const doc = await house.findOne({ _id: HOUSE_DOC_ID });
+  if (!doc || typeof doc.bot_balance !== "number") return null;
+  return { balance: doc.bot_balance, reported_at: doc.bot_balance_reported_at || null };
+}
+
+async function reportBotBalance(balance) {
+  await ensureHouseDoc(0);
+  const house = await getHouseCollection();
+  await house.updateOne(
+    { _id: HOUSE_DOC_ID },
+    { $set: { bot_balance: balance, bot_balance_reported_at: new Date() } }
+  );
+}
+
+module.exports = {
+  getHouseReserve,
+  ensureHouseDoc,
+  adjustHouseReserve,
+  getBotRealBalance,
+  reportBotBalance,
+  HOUSE_DOC_ID,
+};

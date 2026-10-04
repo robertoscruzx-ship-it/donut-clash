@@ -1,6 +1,8 @@
 const express = require("express");
 const { getBetsCollection } = require("../db");
-const { getHouseReserve } = require("../house");
+const { getHouseReserve, getBotRealBalance } = require("../house");
+const { getCirculatingDonuts } = require("../bankroll");
+const { MAX_EXPOSURE_FRACTION } = require("../houseEdge");
 const { requireAdminPanelAuth } = require("../auth");
 
 const router = express.Router();
@@ -53,6 +55,8 @@ router.post("/admin-stats", requireAdminPanelAuth, async (req, res) => {
       totals.total_wagered > 0 ? house_profit / totals.total_wagered : 0;
 
     const house_reserve = await getHouseReserve();
+    const circulating_donuts = await getCirculatingDonuts();
+    const botStatus = await getBotRealBalance();
 
     return res.status(200).json({
       per_game: perGame,
@@ -63,7 +67,17 @@ router.post("/admin-stats", requireAdminPanelAuth, async (req, res) => {
         win_rate: totals.total_bets > 0 ? totals.wins / totals.total_bets : 0,
         forced_loss_rate: totals.total_bets > 0 ? totals.forced_losses / totals.total_bets : 0,
       },
-      house_reserve,
+      // Las tres variables de reserva del diseño original (ver bankroll.js):
+      reserves: {
+        house_reserve_stats_only: house_reserve,
+        circulating_donuts_stats_only: circulating_donuts,
+        bot_real_balance: botStatus ? botStatus.balance : null,
+        bot_real_balance_reported_at: botStatus ? botStatus.reported_at : null,
+        max_exposure_fraction: MAX_EXPOSURE_FRACTION,
+        exposure_limit: botStatus ? botStatus.balance * MAX_EXPOSURE_FRACTION : null,
+        exposure_ratio: botStatus && botStatus.balance > 0 ? circulating_donuts / botStatus.balance : null,
+      },
+      house_reserve, // se deja también en la raíz por compatibilidad con el frontend existente
     });
   } catch (err) {
     console.error("Error en /admin/stats:", err);
