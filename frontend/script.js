@@ -24,6 +24,27 @@ function parseShorthandAmount(raw) {
   return value;
 }
 
+// Inverso de parseShorthandAmount: convierte un número de donuts a su forma
+// corta (50000000 -> "50M") para mostrarlo en el comando /pay que el
+// usuario copia. Solo abrevia cuando el redondeo no pierde precisión
+// (round-trip exacto); si no, muestra el número completo tal cual.
+function formatShorthand(amount) {
+  const units = [
+    { suffix: "B", value: 1000000000 },
+    { suffix: "M", value: 1000000 },
+    { suffix: "K", value: 1000 },
+  ];
+  for (const { suffix, value } of units) {
+    if (Math.abs(amount) >= value) {
+      const scaled = Math.round((amount / value) * 100) / 100;
+      if (scaled * value === amount) {
+        return `${scaled}${suffix}`;
+      }
+    }
+  }
+  return String(amount);
+}
+
 // ==============================
 // ESTADO GLOBAL
 // ==============================
@@ -251,7 +272,7 @@ document.querySelectorAll(".amount-chip").forEach((chip) => {
 depositContinueBtn.addEventListener("click", () => {
   const amt = Math.floor(parseShorthandAmount(depositAmount.value));
   if (!(amt >= MIN_DEPOSIT)) return;
-  depositPayCommand.textContent = `/pay ${BOT_IGN} ${amt}`;
+  depositPayCommand.textContent = `/pay ${BOT_IGN} ${formatShorthand(amt)}`;
   depositCommandBox.classList.remove("hidden");
 });
 
