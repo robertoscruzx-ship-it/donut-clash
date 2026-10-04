@@ -1,0 +1,7 @@
+{
+  "rewrites": [
+    { "source": "/api/account/(.*)", "destination": "/api/account/$1" },
+    { "source": "/api/games/(.*)", "destination": "/api/games/$1" },
+    { "source": "/api/admin/(.*)", "destination": "/api/admin/$1" }
+  ]
+}
