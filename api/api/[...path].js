@@ -21,9 +21,9 @@ const app = express();
 app.use(express.json());
 app.use(cors);
 
-app.use(accountRoutes);
-app.use(adminRoutes);
-app.use(gamesRoutes);
-app.use(userRoutes);
+app.use("/api", accountRoutes);
+app.use("/api", adminRoutes);
+app.use("/api", gamesRoutes);
+app.use("/api", userRoutes);
 
 module.exports = app;
