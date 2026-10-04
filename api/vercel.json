@@ -1,7 +1,7 @@
 {
   "rewrites": [
-    { "source": "/api/account/(.*)", "destination": "/api/account/$1" },
-    { "source": "/api/games/(.*)", "destination": "/api/games/$1" },
-    { "source": "/api/admin/(.*)", "destination": "/api/admin/$1" }
+    { "source": "/api/account/:match*", "destination": "/api/account" },
+    { "source": "/api/games/:match*", "destination": "/api/games" },
+    { "source": "/api/admin/:match*", "destination": "/api/admin" }
   ]
 }
