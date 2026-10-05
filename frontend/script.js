@@ -707,12 +707,32 @@ function endMines(bombs){
 // con el servidor (que es la única fuente de verdad de los tiempos), y usa
 // requestAnimationFrame solo para interpolar el multiplicador entre sondeos
 // y que se vea fluido, nunca para decidir nada por sí mismo.
+// Dimensiones internas del gráfico (unidades del viewBox, no píxeles reales
+// — el SVG escala solo). Dejan espacio a la derecha/abajo para las
+// etiquetas de los ejes.
+const CRASH_GRAPH = { left: 10, top: 16, right: 54, bottom: 90, width: 1000, height: 480 };
+
 function renderCrash(){
   layout(
     `<div class="stage-title">📈 <span data-i18n="game.crash.name">Crash</span></div>
-     <div class="crash-center">
-       <div class="crash-display" id="crashMult">1.00x</div>
-       <div class="muted" id="crashStatusLine" data-i18n="game.crash.currentPayout">CURRENT PAYOUT</div>
+     <div class="crash-wrap">
+       <div class="crash-readout">
+         <div class="crash-display" id="crashMult">1.00<sup>x</sup></div>
+         <div class="crash-sub" id="crashStatusLine" data-i18n="game.crash.currentPayout">CURRENT PAYOUT</div>
+       </div>
+       <svg id="crashSvg" class="crash-svg" viewBox="0 0 1000 480" preserveAspectRatio="none">
+         <defs>
+           <linearGradient id="crashFillGrad" x1="0" y1="0" x2="0" y2="1">
+             <stop offset="0%" stop-color="#f6c343" stop-opacity="0.55"/>
+             <stop offset="100%" stop-color="#f6c343" stop-opacity="0"/>
+           </linearGradient>
+         </defs>
+         <g id="crashAxisY"></g>
+         <path id="crashArea" class="crash-area" d=""></path>
+         <path id="crashLine" class="crash-line" d=""></path>
+         <g id="crashAxisX"></g>
+         <text id="crashRocket" class="crash-rocket" x="0" y="0" style="opacity:0">🚀</text>
+       </svg>
      </div>
      <div class="crash-history" id="crashHistory"></div>
      <div class="crash-players muted small" id="crashPlayers"></div>`,
@@ -726,9 +746,135 @@ function renderCrash(){
 
   state.crash = { round: null, joined: false, cashedOut: false, auto: 0, busy: false, raf: null, pollHandle: null };
   state.cleanupGame = crashStop;
+  crashRenderAxes(8, 2);
   crashPoll();
   state.crash.pollHandle = setInterval(crashPoll, 1000);
   state.crash.raf = requestAnimationFrame(crashTick);
+}
+
+// ---- Gráfico de Crash: curva animada del despegue, SVG dibujado a mano ----
+// Redondea a un "paso" de rejilla agradable (1/2/5/10 x 10^n) para que las
+// etiquetas de los ejes no muestren números feos al reescalar en vivo.
+function crashNiceStep(rough){
+  if (!(rough > 0)) return 1;
+  const pow10 = Math.pow(10, Math.floor(Math.log10(rough)));
+  const frac = rough / pow10;
+  let niceFrac;
+  if (frac < 1.5) niceFrac = 1;
+  else if (frac < 3) niceFrac = 2;
+  else if (frac < 7) niceFrac = 5;
+  else niceFrac = 10;
+  return niceFrac * pow10;
+}
+function crashYTicks(maxM){
+  const range = Math.max(maxM - 1, 0.001);
+  const step = crashNiceStep(range / 3);
+  const ticks = [];
+  for (let v = step; v <= range + step * 0.001 && ticks.length < 4; v += step) ticks.push(1 + v);
+  return ticks;
+}
+function crashXTicks(maxT){
+  const step = crashNiceStep(maxT / 3);
+  const ticks = [];
+  for (let v = step; v <= maxT + step * 0.001 && ticks.length < 4; v += step) ticks.push(v);
+  return ticks;
+}
+function crashBuildPath(points){
+  if (!points.length) return "";
+  return "M" + points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L");
+}
+function crashBuildArea(points, baselineY){
+  if (!points.length) return "";
+  const first = points[0], last = points[points.length - 1];
+  return `${crashBuildPath(points)} L${last.x.toFixed(1)},${baselineY} L${first.x.toFixed(1)},${baselineY} Z`;
+}
+
+// Redibuja solo las líneas/etiquetas de la rejilla para el rango visible
+// actual (se llama en cada frame porque el rango se va "alejando" a medida
+// que sube el multiplicador, como en cualquier juego de crash).
+function crashRenderAxes(maxT, maxM){
+  const g = CRASH_GRAPH;
+  const plotW = g.width - g.left - g.right;
+  const plotH = g.height - g.top - g.bottom;
+  const baselineY = g.top + plotH;
+
+  const yEl = $("crashAxisY");
+  if (yEl) {
+    yEl.innerHTML = crashYTicks(maxM).map((m) => {
+      const y = g.top + (1 - (m - 1) / Math.max(maxM - 1, 0.001)) * plotH;
+      return `<line x1="${g.left}" y1="${y.toFixed(1)}" x2="${g.left + plotW}" y2="${y.toFixed(1)}" class="crash-grid"></line>` +
+        `<text x="${(g.left + plotW + 8).toFixed(1)}" y="${(y + 4).toFixed(1)}" class="crash-axis-label">${m.toFixed(0)}x</text>`;
+    }).join("");
+  }
+  const xEl = $("crashAxisX");
+  if (xEl) {
+    xEl.innerHTML = crashXTicks(maxT).map((sVal) => {
+      const x = g.left + (sVal / maxT) * plotW;
+      return `<text x="${x.toFixed(1)}" y="${(baselineY + 22).toFixed(1)}" class="crash-axis-label" text-anchor="middle">${sVal.toFixed(0)}s</text>`;
+    }).join("");
+  }
+}
+
+// Dibuja la curva de despegue tal como se ve en este instante. status es
+// "betting" | "running" | "crashed"; en "running" se recalcula en cada
+// requestAnimationFrame con el tiempo transcurrido desde round_start (el
+// servidor sigue siendo quien decide cuándo explota de verdad — esto es
+// solo la representación visual). En "crashed" se congela exactamente en
+// el punto de choque real, calculado a partir de crash_point.
+function crashRenderGraph(status, round){
+  const svg = $("crashSvg");
+  const line = $("crashLine"), area = $("crashArea"), rocket = $("crashRocket");
+  if (!svg || !line || !area || !rocket) return;
+  const g = CRASH_GRAPH;
+  const plotW = g.width - g.left - g.right;
+  const plotH = g.height - g.top - g.bottom;
+  const baselineY = g.top + plotH;
+
+  if (!round || (status !== "running" && status !== "crashed")) {
+    line.setAttribute("d", "");
+    area.setAttribute("d", "");
+    rocket.style.opacity = "0";
+    svg.classList.remove("crashed");
+    crashRenderAxes(8, 2);
+    return;
+  }
+
+  const rate = round.growth_rate;
+  const elapsed = status === "crashed"
+    ? Math.log(round.crash_point) / rate
+    : Math.max(0, (Date.now() - round.round_start) / 1000);
+  const currentM = Math.exp(rate * elapsed);
+  const maxT = Math.max(elapsed * 1.15, 8);
+  const maxM = Math.max(currentM * 1.15, 2);
+  crashRenderAxes(maxT, maxM);
+
+  const SAMPLES = 48;
+  const points = [];
+  for (let i = 0; i <= SAMPLES; i++) {
+    const tt = (elapsed * i) / SAMPLES;
+    const mm = Math.exp(rate * tt);
+    points.push({
+      x: g.left + (tt / maxT) * plotW,
+      y: g.top + (1 - (mm - 1) / Math.max(maxM - 1, 0.001)) * plotH,
+    });
+  }
+  line.setAttribute("d", crashBuildPath(points));
+  area.setAttribute("d", crashBuildArea(points, baselineY));
+  svg.classList.toggle("crashed", status === "crashed");
+
+  const last = points[points.length - 1];
+  const prev = points[points.length - 2] || points[0];
+  if (last) {
+    // Orienta la nave con la tangente de la curva en la punta; el emoji
+    // 🚀 ya "mira" de por sí hacia arriba a la derecha (~45°), así que solo
+    // se le suma la diferencia con el ángulo real de la curva en ese punto.
+    const angle = Math.atan2(last.y - prev.y, last.x - prev.x) * (180 / Math.PI);
+    rocket.setAttribute("x", last.x.toFixed(1));
+    rocket.setAttribute("y", last.y.toFixed(1));
+    rocket.setAttribute("transform", `rotate(${(angle + 45).toFixed(1)} ${last.x.toFixed(1)} ${last.y.toFixed(1)})`);
+    rocket.textContent = status === "crashed" ? "💥" : "🚀";
+    rocket.style.opacity = "1";
+  }
 }
 
 // Deja de sondear/animar. Se llama al salir de la pantalla de Crash — la
@@ -811,22 +957,29 @@ function crashTick(){
   const c = state.crash;
   if (!c) return;
   const round = c.round;
-  if (round) {
+  const multEl = $("crashMult");
+  if (round && multEl) {
     if (round.status === "betting") {
       const secsLeft = Math.max(0, (round.betting_end - Date.now()) / 1000);
-      $("crashMult").textContent = "1.00x";
+      multEl.innerHTML = `1.00<sup>x</sup>`;
+      multEl.classList.remove("crashed");
       $("crashStatusLine").textContent = `${t("game.crash.nextRoundIn")} ${secsLeft.toFixed(1)}s`;
+      crashRenderGraph("betting", round);
     } else if (round.status === "running") {
       const elapsed = Math.max(0, (Date.now() - round.round_start) / 1000);
       const m = Math.exp(round.growth_rate * elapsed);
-      $("crashMult").textContent = m.toFixed(2) + "x";
+      multEl.innerHTML = `${m.toFixed(2)}<sup>x</sup>`;
+      multEl.classList.remove("crashed");
       $("crashStatusLine").textContent = t("game.crash.currentPayout");
+      crashRenderGraph("running", round);
       if (c.joined && !c.cashedOut && !c.busy && c.auto && m >= c.auto) {
         crashCashout();
       }
     } else if (round.status === "crashed") {
-      $("crashMult").textContent = round.crash_point.toFixed(2) + "x";
+      multEl.innerHTML = `${round.crash_point.toFixed(2)}<sup>x</sup>`;
+      multEl.classList.add("crashed");
       $("crashStatusLine").textContent = t("game.crash.roundCrashed");
+      crashRenderGraph("crashed", round);
     }
   }
   c.raf = requestAnimationFrame(crashTick);
