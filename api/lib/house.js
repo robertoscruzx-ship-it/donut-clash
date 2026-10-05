@@ -56,11 +56,28 @@ async function reportBotBalance(balance) {
   );
 }
 
+/**
+ * Número de ronda global de Crash, incrementado atómicamente cada vez que
+ * se abre una ronda nueva. Sirve como "nonce" público para la verificación
+ * de fairness y como etiqueta visible ("Ronda #123") en el frontend.
+ */
+async function nextCrashRoundNumber() {
+  await ensureHouseDoc(0);
+  const house = await getHouseCollection();
+  const result = await house.findOneAndUpdate(
+    { _id: HOUSE_DOC_ID },
+    { $inc: { crash_round_seq: 1 } },
+    { returnDocument: "after" }
+  );
+  return result.crash_round_seq;
+}
+
 module.exports = {
   getHouseReserve,
   ensureHouseDoc,
   adjustHouseReserve,
   getBotRealBalance,
   reportBotBalance,
+  nextCrashRoundNumber,
   HOUSE_DOC_ID,
 };

@@ -61,6 +61,7 @@ const state = {
   roundActive: false,
   mines: null,
   crash: null,
+  cleanupGame: null,
   balanceLoop: null,
 };
 
@@ -552,6 +553,7 @@ const GAMES = { mines: renderMines, crash: renderCrash, coinflip: renderCoinflip
 function navigate(name){
   if (name === state.view) return;
   if (state.roundActive) { showToast(t("toast.finishRound"), { type: "error" }); return; }
+  if (state.cleanupGame) { state.cleanupGame(); state.cleanupGame = null; }
   state.view = name;
   document.querySelectorAll(".sidebar-item").forEach((b) => b.classList.toggle("active", (b.dataset.game || b.dataset.view) === name));
   homeView.classList.toggle("hidden", name !== "home");
@@ -698,66 +700,178 @@ function endMines(bombs){
   });
 }
 
-// ---------- CRASH ----------
+// ---------- CRASH (ronda global compartida por todos los jugadores) ----------
+// A diferencia de Mines/Coinflip, aquí no hay "mi partida": hay UNA ronda a
+// la vez (betting -> running -> crashed) que todos ven igual. El frontend
+// sondea /games-crash-state ~1 vez por segundo para mantenerse sincronizado
+// con el servidor (que es la única fuente de verdad de los tiempos), y usa
+// requestAnimationFrame solo para interpolar el multiplicador entre sondeos
+// y que se vea fluido, nunca para decidir nada por sí mismo.
 function renderCrash(){
   layout(
     `<div class="stage-title">📈 <span data-i18n="game.crash.name">Crash</span></div>
-     <div class="crash-center"><div class="crash-display" id="crashMult">1.00x</div><div class="muted" data-i18n="game.crash.currentPayout">CURRENT PAYOUT</div></div>`,
+     <div class="crash-center">
+       <div class="crash-display" id="crashMult">1.00x</div>
+       <div class="muted" id="crashStatusLine" data-i18n="game.crash.currentPayout">CURRENT PAYOUT</div>
+     </div>
+     <div class="crash-history" id="crashHistory"></div>
+     <div class="crash-players muted small" id="crashPlayers"></div>`,
     `<label class="bet-label" data-i18n="bet.autoCashout">Auto Cashout</label>
      <div class="bet-row">
        <input type="number" id="autoAt" min="1.01" step="0.01" placeholder="—">
        <button class="chip" data-at="2">2x</button><button class="chip" data-at="10">10x</button>
-     </div>`, "bet.placeBet");
+     </div>`, "game.crash.join");
   gameView.querySelectorAll("[data-at]").forEach((b) => { b.onclick = () => { $("autoAt").value = b.dataset.at; }; });
-  $("actionBtn").onclick = () => (state.crash ? crashCash() : crashStart());
+  $("actionBtn").onclick = crashAction;
+
+  state.crash = { round: null, joined: false, cashedOut: false, auto: 0, busy: false, raf: null, pollHandle: null };
+  state.cleanupGame = crashStop;
+  crashPoll();
+  state.crash.pollHandle = setInterval(crashPoll, 1000);
+  state.crash.raf = requestAnimationFrame(crashTick);
 }
 
-async function crashStart(){
-  const bet = validBet();
-  if (bet < 1) return;
+// Deja de sondear/animar. Se llama al salir de la pantalla de Crash — la
+// ronda sigue viva en el servidor, solo dejamos de mirarla desde aquí.
+function crashStop(){
+  const c = state.crash;
+  if (!c) return;
+  if (c.pollHandle) { clearInterval(c.pollHandle); c.pollHandle = null; }
+  if (c.raf) { cancelAnimationFrame(c.raf); c.raf = null; }
+}
+
+// Habilita/deshabilita el formulario de apuesta (no bloquea la navegación:
+// la apuesta de Crash vive en el servidor, no se pierde si el jugador se va).
+function crashSetFormLocked(locked){
+  state.roundActive = false;
+  gameView.querySelectorAll(".bet-panel input, .bet-panel .chip").forEach((e) => { e.disabled = locked; });
+}
+
+async function crashPoll(){
+  if (!state.crash) return;
   try {
-    const d = await call("/games-crash-start", { bet_amount: bet, client_seed: getOrCreateClientSeed() });
-    state.crash = { id: d.game_id, t0: Date.now(), rate: d.growth_rate, auto: parseFloat($("autoAt").value) || 0 };
-    lockPanel(true);
-    setAction("bet.cashOut");
-    say("");
-    refreshBalance();
-    crashTick();
-  } catch (e) { fail(e); }
+    const d = await apiFetch("/games-crash-state", {
+      method: "POST",
+      body: JSON.stringify({ minecraft_username: state.username }),
+    });
+    crashApplyState(d);
+  } catch (e) {
+    // Error de red momentáneo: simplemente se reintenta en el próximo sondeo.
+  }
 }
 
+function crashApplyState(d){
+  const c = state.crash;
+  if (!c) return;
+  const prevStatus = c.round ? c.round.status : null;
+  c.round = d;
+  c.joined = !!d.my_bet;
+  c.cashedOut = !!(d.my_bet && d.my_bet.cashed_out);
+
+  renderCrashHistory(d.history);
+  const playersEl = $("crashPlayers");
+  if (playersEl) {
+    playersEl.textContent = d.players_count
+      ? `${d.players_count} ${t("game.crash.playersInRound")} · ${d.total_wagered} ${t("donuts")}`
+      : t("game.crash.noPlayersYet");
+  }
+
+  if (d.status === "betting") {
+    crashSetFormLocked(c.joined);
+    if (c.joined) { setAction("game.crash.waitingRound"); $("actionBtn").disabled = true; }
+    else { setAction("game.crash.join"); $("actionBtn").disabled = false; }
+  } else if (d.status === "running") {
+    crashSetFormLocked(true);
+    if (c.joined && !c.cashedOut) { setAction("bet.cashOut"); $("actionBtn").disabled = false; }
+    else { setAction(c.cashedOut ? "game.crash.cashedOut" : "game.crash.missedRound"); $("actionBtn").disabled = true; }
+  } else if (d.status === "crashed") {
+    crashSetFormLocked(true);
+    setAction("game.crash.join");
+    $("actionBtn").disabled = true;
+    if (prevStatus === "running" && c.joined) {
+      if (c.cashedOut && d.my_bet.payout) say(wonText(d.my_bet.cashout_multiplier, d.my_bet.payout));
+      else say(t("game.crash.crashed"));
+    }
+  }
+}
+
+function renderCrashHistory(history){
+  const el = $("crashHistory");
+  if (!el) return;
+  el.innerHTML = (history || []).map((h) => {
+    const cls = h.crash_point >= 2 ? "crash-chip win" : "crash-chip lose";
+    return `<span class="${cls}">${h.crash_point.toFixed(2)}x</span>`;
+  }).join("");
+}
+
+// Bucle visual: interpola el multiplicador entre sondeos del servidor para
+// que la animación se vea fluida, sin decidir nada por sí mismo (el
+// servidor es quien de verdad define cuándo explota).
 function crashTick(){
   const c = state.crash;
   if (!c) return;
-  const m = Math.exp(c.rate * (Date.now() - c.t0) / 1000);
-  $("crashMult").textContent = m.toFixed(2) + "x";
-  if (c.auto && m >= c.auto) { crashCash(); return; }
+  const round = c.round;
+  if (round) {
+    if (round.status === "betting") {
+      const secsLeft = Math.max(0, (round.betting_end - Date.now()) / 1000);
+      $("crashMult").textContent = "1.00x";
+      $("crashStatusLine").textContent = `${t("game.crash.nextRoundIn")} ${secsLeft.toFixed(1)}s`;
+    } else if (round.status === "running") {
+      const elapsed = Math.max(0, (Date.now() - round.round_start) / 1000);
+      const m = Math.exp(round.growth_rate * elapsed);
+      $("crashMult").textContent = m.toFixed(2) + "x";
+      $("crashStatusLine").textContent = t("game.crash.currentPayout");
+      if (c.joined && !c.cashedOut && !c.busy && c.auto && m >= c.auto) {
+        crashCashout();
+      }
+    } else if (round.status === "crashed") {
+      $("crashMult").textContent = round.crash_point.toFixed(2) + "x";
+      $("crashStatusLine").textContent = t("game.crash.roundCrashed");
+    }
+  }
   c.raf = requestAnimationFrame(crashTick);
 }
 
-async function crashCash(){
+function crashAction(){
   const c = state.crash;
-  if (!c || c.busy) return;
-  c.busy = true;
-  cancelAnimationFrame(c.raf);
+  if (!c || !c.round) return;
+  if (c.round.status === "betting" && !c.joined) crashJoin();
+  else if (c.round.status === "running" && c.joined && !c.cashedOut) crashCashout();
+}
+
+async function crashJoin(){
+  const bet = validBet();
+  if (bet < 1) return;
+  const c = state.crash;
+  c.auto = parseFloat($("autoAt").value) || 0;
+  $("actionBtn").disabled = true;
   try {
-    const d = await call("/games-crash-cashout", { game_id: c.id });
-    if (d.result === "crashed"){
-      $("crashMult").textContent = d.crash_point.toFixed(2) + "x";
-      say(t("game.crash.crashed"));
-    } else {
-      $("crashMult").textContent = d.multiplier.toFixed(2) + "x";
-      say(wonText(d.multiplier, d.payout));
-      setBalance(d.balance);
-    }
-    state.crash = null;
-    lockPanel(false);
-    setAction("bet.placeBet");
+    const d = await call("/games-crash-join", { bet_amount: bet });
+    crashApplyState(d);
+    say("");
+    refreshBalance();
   } catch (e) {
-    c.busy = false;
     fail(e);
-    c.raf = requestAnimationFrame(crashTick);
+    $("actionBtn").disabled = false;
   }
+}
+
+async function crashCashout(){
+  const c = state.crash;
+  if (!c || c.cashedOut || c.busy) return;
+  c.busy = true;
+  $("actionBtn").disabled = true;
+  try {
+    const d = await call("/games-crash-cashout", {});
+    c.cashedOut = true;
+    say(wonText(d.multiplier, d.payout));
+    setBalance(d.balance);
+    setAction("game.crash.cashedOut");
+  } catch (e) {
+    fail(e);
+    $("actionBtn").disabled = false;
+  }
+  c.busy = false;
 }
 
 // ==============================

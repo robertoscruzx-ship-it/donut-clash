@@ -448,6 +448,12 @@ body{
 .game-stage .crash-display{font-size:4rem; margin:0;}
 .game-stage .mines-grid{margin-top:56px;}
 .game-stage .coin{margin-top:120px; font-size:5rem;}
+.crash-display.crashed{color:var(--danger);}
+.crash-players{position:absolute; top:14px; right:18px; font-size:.75rem;}
+.crash-history{position:absolute; bottom:16px; left:0; right:0; display:flex; justify-content:center; gap:6px; flex-wrap:wrap; padding:0 16px;}
+.crash-chip{font-size:.75rem; font-weight:700; padding:4px 8px; border-radius:6px; background:var(--panel-alt); border:1px solid var(--border); color:var(--text);}
+.crash-chip.win{color:#36d399; border-color:#36d399;}
+.crash-chip.lose{color:var(--danger); border-color:var(--danger);}
 .bet-panel{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:10px;}
 .bet-tabs{display:flex; gap:8px;}
 .bet-tab{flex:1; padding:8px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--muted); font-weight:700; cursor:pointer;}

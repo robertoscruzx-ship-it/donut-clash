@@ -40,6 +40,13 @@ async function getCrashGamesCollection() {
   return db.collection("crash_games");
 }
 
+// Rondas globales de Crash (modelo compartido: todos apuestan y suben en la
+// misma ronda) — reemplaza el uso de crash_games de la versión por-jugador.
+async function getCrashRoundsCollection() {
+  const db = await connectToDatabase();
+  return db.collection("crash_rounds");
+}
+
 async function getHouseCollection() {
   const db = await connectToDatabase();
   return db.collection("house");
@@ -60,6 +67,7 @@ module.exports = {
   getUsersCollection,
   getMinesGamesCollection,
   getCrashGamesCollection,
+  getCrashRoundsCollection,
   getHouseCollection,
   getBetsCollection,
   getWithdrawalsCollection,
