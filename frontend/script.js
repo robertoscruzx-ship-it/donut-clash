@@ -606,14 +606,37 @@ function setAction(key){
 }
 
 // ---------- COINFLIP ----------
+// La moneda es un cilindro 3D (cara = R / cruz = guion) que gira sobre su eje
+// vertical. En reposo gira despacio; al lanzar da varias vueltas rápidas y
+// aterriza mostrando el resultado (0° = cara, 180° = cruz).
+let coinAnim = null;
+function coinIdle(){
+  const el = $("coin");
+  if (!el || !el.animate) return;
+  coinAnim = el.animate([{ transform: "rotateY(0deg)" }, { transform: "rotateY(360deg)" }], { duration: 6000, iterations: Infinity });
+}
+function flipCoin(result){
+  const el = $("coin");
+  if (!el || !el.animate) return Promise.resolve();
+  if (coinAnim) coinAnim.cancel();
+  const end = (result === "heads" ? 0 : 180) + 360 * 6;
+  coinAnim = el.animate(
+    [{ transform: "rotateY(0deg) translateY(0)" }, { transform: `rotateY(${end * 0.5}deg) translateY(-26px)`, offset: 0.5 }, { transform: `rotateY(${end}deg) translateY(0)` }],
+    { duration: 1700, easing: "cubic-bezier(.2,.7,.25,1)", fill: "forwards" });
+  return coinAnim.finished.then(() => {
+    el.style.transform = `rotateY(${result === "heads" ? 0 : 180}deg)`;
+    coinAnim.cancel(); coinAnim = null;
+  }).catch(() => {});
+}
 function renderCoinflip(){
   layout(
-    `<div class="stage-title">🪙 <span data-i18n="game.coinflip.name">Coinflip</span></div><div class="coin" id="coin">🪙</div>`,
+    `<div class="stage-title">🪙 <span data-i18n="game.coinflip.name">Coinflip</span></div><div class="coin-stage"><div class="coin3d" id="coin">${"<i class=\"coin-edge\"></i>".repeat(9)}<i class="coin-face coin-front"></i><i class="coin-face coin-back"></i></div></div>`,
     `<label class="bet-label" data-i18n="game.coinflip.pick">Pick a side</label>
      <div class="bet-row">
        <button class="chip side active" data-side="heads" data-i18n="game.coinflip.heads">Heads</button>
        <button class="chip side" data-side="tails" data-i18n="game.coinflip.tails">Tails</button>
      </div>`, "bet.placeBet", true);
+  coinIdle();
   const sides = gameView.querySelectorAll(".side");
   sides.forEach((b) => { b.onclick = () => { sides.forEach((x) => x.classList.remove("active")); b.classList.add("active"); }; });
   // Demo: 50/50 realmente justo (pago 2x, sin margen de la casa) y sin
@@ -622,7 +645,7 @@ function renderCoinflip(){
     const choice = gameView.querySelector(".side.active").dataset.side;
     const r = new Uint32Array(1); crypto.getRandomValues(r);
     const result = r[0] % 2 === 0 ? "heads" : "tails";
-    $("coin").textContent = result === "heads" ? "😀" : "🌑";
+    flipCoin(result);
     say(`${t("bet.demoTag")} ${result === choice ? t("game.coinflip.demoWon") : t("game.coinflip.demoLost")}`);
   };
   $("actionBtn").onclick = async () => {
@@ -632,7 +655,7 @@ function renderCoinflip(){
     $("actionBtn").disabled = true;
     try {
       const d = await call("/games-bet-coinflip", { bet_amount: bet, choice, client_seed: getOrCreateClientSeed() });
-      $("coin").textContent = d.result === "heads" ? "😀" : "🌑";
+      await flipCoin(d.result);
       say(d.won ? `${t("game.coinflip.won")}${d.payout} ${t("donuts")}.` : `${t("game.coinflip.lost")}${bet} ${t("donuts")}.`);
       setBalance(d.balance);
     } catch (e) { fail(e); }

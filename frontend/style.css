@@ -543,3 +543,17 @@ body{
 .btn-demo{background:#2a3a52; color:#c4d2e6; border:1px solid #3a4d6b; border-radius:8px; font-weight:700; cursor:pointer; transition:background .15s;}
 .btn-demo:hover:not(:disabled){background:#344866; color:#fff;}
 .btn-demo:disabled{opacity:.5; cursor:not-allowed;}
+
+/* ===== Coinflip: moneda 3D ===== */
+.coin-stage{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; perspective:900px;}
+.coin3d{position:relative; width:190px; height:190px; transform-style:preserve-3d; will-change:transform;}
+.coin3d .coin-face, .coin3d .coin-edge{position:absolute; inset:0; border-radius:50%; display:block;}
+.coin-face{background-size:contain; background-repeat:no-repeat; background-position:center; backface-visibility:hidden; filter:drop-shadow(0 6px 10px rgba(0,0,0,.5));}
+.coin-front{background-image:url("assets/coin_front.png"); transform:translateZ(8px);}
+.coin-back{background-image:url("assets/coin_back.png"); transform:rotateY(180deg) translateZ(8px);}
+.coin-edge{background:linear-gradient(90deg,#b97a0a,#f3c24a,#b97a0a);}
+.coin-edge:nth-child(1){transform:translateZ(-7px)} .coin-edge:nth-child(2){transform:translateZ(-5.5px)}
+.coin-edge:nth-child(3){transform:translateZ(-4px)} .coin-edge:nth-child(4){transform:translateZ(-2px)}
+.coin-edge:nth-child(5){transform:translateZ(0)} .coin-edge:nth-child(6){transform:translateZ(2px)}
+.coin-edge:nth-child(7){transform:translateZ(4px)} .coin-edge:nth-child(8){transform:translateZ(5.5px)}
+.coin-edge:nth-child(9){transform:translateZ(7px)}
