@@ -610,6 +610,14 @@ function setAction(key){
 // vertical. En reposo gira despacio; al lanzar da varias vueltas rápidas y
 // aterriza mostrando el resultado (0° = cara, 180° = cruz).
 let coinAnim = null;
+let coinBusy = false;
+// Muestra "You win" / "You lose" (o lo borra con null) bajo la moneda y en el panel.
+function showCoinResult(won){
+  const txt = won === null ? "" : (won ? t("game.coinflip.youWin") : t("game.coinflip.youLose"));
+  const el = $("coinResult");
+  if (el) { el.textContent = txt; el.className = "coin-result" + (won === null ? "" : won ? " win" : " lose"); }
+  say(txt);
+}
 function coinIdle(){
   const el = $("coin");
   if (!el || !el.animate) return;
@@ -630,7 +638,7 @@ function flipCoin(result){
 }
 function renderCoinflip(){
   layout(
-    `<div class="stage-title">🪙 <span data-i18n="game.coinflip.name">Coinflip</span></div><div class="coin-stage"><div class="coin3d" id="coin">${"<i class=\"coin-edge\"></i>".repeat(9)}<i class="coin-face coin-front"></i><i class="coin-face coin-back"></i></div></div>`,
+    `<div class="stage-title">🪙 <span data-i18n="game.coinflip.name">Coinflip</span></div><div class="coin-result" id="coinResult"></div><div class="coin-stage"><div class="coin3d" id="coin">${"<i class=\"coin-edge\"></i>".repeat(9)}<i class="coin-face coin-front"></i><i class="coin-face coin-back"></i></div></div>`,
     `<label class="bet-label" data-i18n="game.coinflip.pick">Pick a side</label>
      <div class="bet-row">
        <button class="chip side active" data-side="heads" data-i18n="game.coinflip.heads">Heads</button>
@@ -645,21 +653,28 @@ function renderCoinflip(){
     const choice = gameView.querySelector(".side.active").dataset.side;
     const r = new Uint32Array(1); crypto.getRandomValues(r);
     const result = r[0] % 2 === 0 ? "heads" : "tails";
-    flipCoin(result);
-    say(`${t("bet.demoTag")} ${result === choice ? t("game.coinflip.demoWon") : t("game.coinflip.demoLost")}`);
+    if (coinBusy) return;
+    coinBusy = true; $("demoBtn").disabled = true; $("actionBtn").disabled = true;
+    showCoinResult(null);
+    flipCoin(result).then(() => {
+      showCoinResult(result === choice);
+      coinBusy = false; $("demoBtn").disabled = false; $("actionBtn").disabled = false;
+    });
   };
   $("actionBtn").onclick = async () => {
     const bet = validBet();
     if (bet < 1) return;
     const choice = gameView.querySelector(".side.active").dataset.side;
-    $("actionBtn").disabled = true;
+    if (coinBusy) return;
+    coinBusy = true; $("actionBtn").disabled = true; $("demoBtn").disabled = true;
+    showCoinResult(null);
     try {
       const d = await call("/games-bet-coinflip", { bet_amount: bet, choice, client_seed: getOrCreateClientSeed() });
       await flipCoin(d.result);
-      say(d.won ? `${t("game.coinflip.won")}${d.payout} ${t("donuts")}.` : `${t("game.coinflip.lost")}${bet} ${t("donuts")}.`);
+      showCoinResult(d.won);
       setBalance(d.balance);
     } catch (e) { fail(e); }
-    $("actionBtn").disabled = false;
+    coinBusy = false; $("actionBtn").disabled = false; $("demoBtn").disabled = false;
   };
 }
 
