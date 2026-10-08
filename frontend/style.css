@@ -38,7 +38,7 @@ body{
   top:0;
   z-index:20;
 }
-.logo{font-size:1.25rem; font-weight:800; letter-spacing:0.5px;}
+.logo{display:flex; align-items:center; font-size:1.25rem; font-weight:800; letter-spacing:0.5px;}
 .logo .accent{color:var(--accent);}
 
 .topbar-center{justify-self:center; display:flex; align-items:center; gap:8px; position:relative;}
@@ -53,17 +53,12 @@ body{
   font-weight:700;
 }
 
-/* Insignia cuadrada de moneda (antes era el emoji 🪙, redondo) */
+/* Moneda de la casa (imagen) */
 .coin-icon{
-  display:inline-flex; align-items:center; justify-content:center;
-  flex-shrink:0;
-  width:18px; height:18px;
-  border-radius:5px;
-  background:linear-gradient(150deg, #ffd874, #e8a317);
-  color:#5c3a00;
-  font-size:11px;
-  font-weight:800;
-  box-shadow:inset 0 -2px 0 rgba(0,0,0,.18);
+  display:inline-block; flex-shrink:0;
+  width:22px; height:22px;
+  background:url("assets/coin.png") center/contain no-repeat;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));
 }
 
 .btn-ghost{
@@ -541,3 +536,5 @@ body{
 .admin-card.good .admin-card-value{color:#36d399;}
 .admin-card.bad{border-color:var(--danger);}
 .admin-card.bad .admin-card-value{color:var(--danger);}
+
+.logo-img{height:34px; width:auto; display:block; margin-right:9px;}

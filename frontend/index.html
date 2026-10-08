@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Donut Clash</title>
+<link rel="icon" type="image/png" href="assets/logo.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,11 +13,11 @@
 
     <!-- TOPBAR -->
     <header class="topbar">
-      <div class="logo" id="logoLink" style="cursor:pointer">🍩 <span>Donut</span><span class="accent">Clash</span></div>
+      <div class="logo" id="logoLink" style="cursor:pointer"><img class="logo-img" src="assets/logo.png" alt=""> <span>Donut</span><span class="accent">Clash</span></div>
 
       <div class="topbar-center">
         <div class="balance-pill">
-          <span class="coin-icon">$</span>
+          <span class="coin-icon"></span>
           <span id="balanceValue">0</span>
         </div>
         <button id="walletBtn" class="wallet-btn hidden" aria-label="Wallet">
@@ -120,7 +121,7 @@
               <div class="transfer-label" data-i18n="account.linked">Linked</div>
             </div>
             <span class="status-badge" data-i18n="account.active">Active</span>
-            <div class="wallet-account-balance"><span class="coin-icon">$</span><span id="walletBalanceValue">0</span></div>
+            <div class="wallet-account-balance"><span class="coin-icon"></span><span id="walletBalanceValue">0</span></div>
           </div>
 
           <div class="wallet-tabs">
@@ -152,7 +153,7 @@
 
             <label class="bet-label" data-i18n="deposit.amount">DEPOSIT AMOUNT</label>
             <div class="amount-input-row">
-              <span class="coin-icon">$</span>
+              <span class="coin-icon"></span>
               <input type="text" inputmode="decimal" id="depositAmount" autocomplete="off" data-i18n-placeholder="deposit.amountPlaceholder" placeholder="$ Amount">
             </div>
             <p class="muted small"><span data-i18n="deposit.minimumPrefix">Minimum deposit: </span><strong>10K</strong></p>
@@ -197,7 +198,7 @@
 
             <label class="bet-label" data-i18n="withdraw.amount">WITHDRAWAL AMOUNT</label>
             <div class="amount-input-row">
-              <span class="coin-icon">$</span>
+              <span class="coin-icon"></span>
               <input type="text" inputmode="decimal" id="withdrawAmount" autocomplete="off" data-i18n-placeholder="withdraw.amountPlaceholder" placeholder="$ Amount">
               <button id="withdrawMaxBtn" class="chip" data-i18n="bet.max">MAX</button>
             </div>
@@ -256,7 +257,7 @@
         </div>
         <div class="account-row">
           <div class="transfer-label" data-i18n="account.balance">BALANCE</div>
-          <div class="account-balance"><span class="coin-icon">$</span><span id="accountBalanceValue">0</span></div>
+          <div class="account-balance"><span class="coin-icon"></span><span id="accountBalanceValue">0</span></div>
         </div>
 
         <div class="xp-block">
