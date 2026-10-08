@@ -561,3 +561,5 @@ body{
 .coin-result{position:absolute; left:0; right:0; bottom:44px; text-align:center; font-size:1.8rem; font-weight:800; min-height:2.2rem; z-index:2;}
 .coin-result.win{color:#36d399;}
 .coin-result.lose{color:var(--danger);}
+
+.coin-payout{position:absolute; top:18px; left:0; right:0; text-align:center; font-size:1.05rem; font-weight:800; letter-spacing:.5px; color:var(--text); z-index:2;}

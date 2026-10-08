@@ -611,6 +611,12 @@ function setAction(key){
 // aterriza mostrando el resultado (0° = cara, 180° = cruz).
 let coinAnim = null;
 let coinBusy = false;
+// Pago mostrado arriba: el real es 1.6x (2x menos el 20% de la casa); el
+// Demo es 2x justo. Se muestra el que corresponde al modo en uso.
+function setCoinPayout(demo){
+  const el = $("coinPayout");
+  if (el) el.textContent = demo ? `2x ${t("game.coinflip.payoutLabel")} · ${t("bet.demo")}` : `1.6x ${t("game.coinflip.payoutLabel")}`;
+}
 // Muestra "You win" / "You lose" (o lo borra con null) bajo la moneda y en el panel.
 function showCoinResult(won){
   const txt = won === null ? "" : (won ? t("game.coinflip.youWin") : t("game.coinflip.youLose"));
@@ -638,13 +644,14 @@ function flipCoin(result){
 }
 function renderCoinflip(){
   layout(
-    `<div class="stage-title">🪙 <span data-i18n="game.coinflip.name">Coinflip</span></div><div class="coin-result" id="coinResult"></div><div class="coin-stage"><div class="coin3d" id="coin">${"<i class=\"coin-edge\"></i>".repeat(9)}<i class="coin-face coin-front"></i><i class="coin-face coin-back"></i></div></div>`,
+    `<div class="coin-payout" id="coinPayout"></div><div class="coin-result" id="coinResult"></div><div class="coin-stage"><div class="coin3d" id="coin">${"<i class=\"coin-edge\"></i>".repeat(9)}<i class="coin-face coin-front"></i><i class="coin-face coin-back"></i></div></div>`,
     `<label class="bet-label" data-i18n="game.coinflip.pick">Pick a side</label>
      <div class="bet-row">
        <button class="chip side active" data-side="heads" data-i18n="game.coinflip.heads">Heads</button>
        <button class="chip side" data-side="tails" data-i18n="game.coinflip.tails">Tails</button>
      </div>`, "bet.placeBet", true);
   coinIdle();
+  setCoinPayout(false);
   const sides = gameView.querySelectorAll(".side");
   sides.forEach((b) => { b.onclick = () => { sides.forEach((x) => x.classList.remove("active")); b.classList.add("active"); }; });
   // Demo: 50/50 realmente justo (pago 2x, sin margen de la casa) y sin
@@ -656,6 +663,7 @@ function renderCoinflip(){
     if (coinBusy) return;
     coinBusy = true; $("demoBtn").disabled = true; $("actionBtn").disabled = true;
     showCoinResult(null);
+    setCoinPayout(true);
     flipCoin(result).then(() => {
       showCoinResult(result === choice);
       coinBusy = false; $("demoBtn").disabled = false; $("actionBtn").disabled = false;
@@ -668,6 +676,7 @@ function renderCoinflip(){
     if (coinBusy) return;
     coinBusy = true; $("actionBtn").disabled = true; $("demoBtn").disabled = true;
     showCoinResult(null);
+    setCoinPayout(false);
     try {
       const d = await call("/games-bet-coinflip", { bet_amount: bet, choice, client_seed: getOrCreateClientSeed() });
       await flipCoin(d.result);
