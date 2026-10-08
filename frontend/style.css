@@ -538,3 +538,8 @@ body{
 .admin-card.bad .admin-card-value{color:var(--danger);}
 
 .logo-img{height:34px; width:auto; display:block; margin-right:9px;}
+
+/* Botón de jugada de prueba (sin apostar) */
+.btn-demo{background:#2a3a52; color:#c4d2e6; border:1px solid #3a4d6b; border-radius:8px; font-weight:700; cursor:pointer; transition:background .15s;}
+.btn-demo:hover:not(:disabled){background:#344866; color:#fff;}
+.btn-demo:disabled{opacity:.5; cursor:not-allowed;}

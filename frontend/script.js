@@ -569,7 +569,7 @@ $("logoLink").addEventListener("click", () => navigate("home"));
 // ==============================
 // LAYOUT: escenario del juego + panel lateral de apuesta
 // ==============================
-function layout(stageHTML, extraHTML, actionKey){
+function layout(stageHTML, extraHTML, actionKey, withDemo = false){
   gameView.innerHTML = `
     <div class="game-layout">
       <div class="game-stage">${stageHTML}</div>
@@ -587,6 +587,7 @@ function layout(stageHTML, extraHTML, actionKey){
         </div>
         ${extraHTML}
         <button id="actionBtn" class="btn-primary btn-lg" data-i18n="${actionKey}"></button>
+        ${withDemo ? `<button id="demoBtn" class="btn-demo btn-lg" data-i18n="bet.demo">Demo</button>` : ""}
         <p id="gameMessage" class="muted small"></p>
       </aside>
     </div>`;
@@ -596,7 +597,7 @@ function layout(stageHTML, extraHTML, actionKey){
 }
 function lockPanel(locked){
   state.roundActive = locked;
-  gameView.querySelectorAll(".bet-panel input, .bet-panel .chip").forEach((e) => { e.disabled = locked; });
+  gameView.querySelectorAll(".bet-panel input, .bet-panel .chip, #demoBtn").forEach((e) => { e.disabled = locked; });
 }
 function setAction(key){
   const b = $("actionBtn");
@@ -612,9 +613,18 @@ function renderCoinflip(){
      <div class="bet-row">
        <button class="chip side active" data-side="heads" data-i18n="game.coinflip.heads">Heads</button>
        <button class="chip side" data-side="tails" data-i18n="game.coinflip.tails">Tails</button>
-     </div>`, "bet.placeBet");
+     </div>`, "bet.placeBet", true);
   const sides = gameView.querySelectorAll(".side");
   sides.forEach((b) => { b.onclick = () => { sides.forEach((x) => x.classList.remove("active")); b.classList.add("active"); }; });
+  // Demo: 50/50 realmente justo (pago 2x, sin margen de la casa) y sin
+  // apostar nada — todo se resuelve aquí, no toca saldo ni servidor.
+  $("demoBtn").onclick = () => {
+    const choice = gameView.querySelector(".side.active").dataset.side;
+    const r = new Uint32Array(1); crypto.getRandomValues(r);
+    const result = r[0] % 2 === 0 ? "heads" : "tails";
+    $("coin").textContent = result === "heads" ? "😀" : "🌑";
+    say(`${t("bet.demoTag")} ${result === choice ? t("game.coinflip.demoWon") : t("game.coinflip.demoLost")}`);
+  };
   $("actionBtn").onclick = async () => {
     const bet = validBet();
     if (bet < 1) return;
@@ -635,7 +645,7 @@ function renderMines(){
   layout(
     `<div class="stage-title">💣 <span data-i18n="game.mines.name">Mines</span></div><div class="mines-grid" id="minesGrid"></div>`,
     `<label class="bet-label" data-i18n="game.mines.bombs">Bombs</label>
-     <input type="number" id="bombs" min="1" max="24" value="3">`, "bet.placeBet");
+     <input type="number" id="bombs" min="1" max="24" value="3">`, "bet.placeBet", true);
   const grid = $("minesGrid");
   for (let i = 0; i < 25; i++){
     const tile = document.createElement("div");
@@ -645,6 +655,25 @@ function renderMines(){
     grid.appendChild(tile);
   }
   $("actionBtn").onclick = () => (state.mines ? minesCashout() : minesStart());
+  $("demoBtn").onclick = minesDemoStart;
+}
+
+// Multiplicador JUSTO de Mines (sin margen de la casa) para el modo demo.
+function minesFairMultiplier(revealed, bombs){
+  let m = 1;
+  for (let i = 0; i < revealed; i++) m *= (25 - i) / (25 - i - bombs);
+  return m;
+}
+function minesDemoStart(){
+  const bombs = Math.min(24, Math.max(1, Math.floor(Number($("bombs").value)) || 3));
+  const idx = Array.from({ length: 25 }, (_, i) => i);
+  const rnd = new Uint32Array(25); crypto.getRandomValues(rnd);
+  for (let i = 24; i > 0; i--) { const j = rnd[i] % (i + 1); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  state.mines = { demo: true, bombsCount: bombs, bombs: new Set(idx.slice(0, bombs)), revealed: 0 };
+  gameView.querySelectorAll(".mine-tile").forEach((x) => { x.className = "mine-tile"; x.textContent = "?"; });
+  lockPanel(true);
+  setAction("bet.cashOut");
+  say(t("bet.demoTag"));
 }
 
 async function minesStart(){
@@ -663,6 +692,20 @@ async function minesStart(){
 
 async function revealTile(i, tile){
   if (!state.mines) { requireSession(); return; }
+  if (state.mines.demo) {
+    if (tile.classList.contains("revealed-safe")) return;
+    const m = state.mines;
+    if (m.bombs.has(i)) {
+      tile.classList.add("revealed-bomb"); tile.textContent = "💣";
+      say(`${t("bet.demoTag")} ${t("game.mines.boom")}`);
+      endMines([...m.bombs]);
+    } else {
+      m.revealed += 1;
+      tile.classList.add("revealed-safe"); tile.textContent = "💎";
+      say(`${t("bet.demoTag")} ${t("game.mines.multiplierPrefix")}${minesFairMultiplier(m.revealed, m.bombsCount).toFixed(2)}x`);
+    }
+    return;
+  }
   if (tile.dataset.busy || tile.classList.contains("revealed-safe")) return;
   tile.dataset.busy = 1;
   try {
@@ -682,6 +725,13 @@ async function revealTile(i, tile){
 }
 
 async function minesCashout(){
+  if (state.mines && state.mines.demo) {
+    const m = state.mines;
+    if (m.revealed === 0) { say(`${t("bet.demoTag")} ${t("game.mines.revealFirst")}`); return; }
+    say(`${t("bet.demoTag")} ${t("game.mines.demoCashed")}${minesFairMultiplier(m.revealed, m.bombsCount).toFixed(2)}x`);
+    endMines([...m.bombs]);
+    return;
+  }
   try {
     const d = await call("/games-mines-cashout", { game_id: state.mines.id });
     say(wonText(d.multiplier, d.payout));
