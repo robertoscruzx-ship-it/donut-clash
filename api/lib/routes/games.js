@@ -19,8 +19,10 @@ const {
 
 const router = express.Router();
 
-const FAIR_WIN_PROBABILITY = 0.5;
-const COINFLIP_PAYOUT_MULTIPLIER = 2 * (1 - HOUSE_EDGE);
+// Coinflip: paga 1.85x y el jugador gana el 35% de las veces (la casa 65%).
+// Valor esperado del jugador = 0.35 * 1.85 = 0.6475 por donut apostado.
+const COINFLIP_WIN_PROBABILITY = 0.35;
+const COINFLIP_PAYOUT_MULTIPLIER = 1.85;
 
 /**
  * POST /api/games-bet-coinflip
@@ -52,13 +54,16 @@ router.post("/games-bet-coinflip", async (req, res) => {
     const nonce = user.nonce;
     const roll = fairFloat(user.server_seed, client_seed || "default", nonce);
 
+    // roll < 0.35 => cae el lado que eligió el jugador; si no, el contrario.
+    // La tirada sigue saliendo de fairFloat (verificable con la semilla).
+    const opposite = choice === "heads" ? "tails" : "heads";
     let result, won;
     if (exposure.forcedLoss) {
-      result = choice === "heads" ? "tails" : "heads";
+      result = opposite;
       won = false;
     } else {
-      result = roll < FAIR_WIN_PROBABILITY ? "heads" : "tails";
-      won = result === choice;
+      won = roll < COINFLIP_WIN_PROBABILITY;
+      result = won ? choice : opposite;
     }
 
     let payout = 0;

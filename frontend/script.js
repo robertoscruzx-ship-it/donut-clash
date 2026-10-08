@@ -611,11 +611,11 @@ function setAction(key){
 // aterriza mostrando el resultado (0° = cara, 180° = cruz).
 let coinAnim = null;
 let coinBusy = false;
-// Pago mostrado arriba: el real es 1.6x (2x menos el 20% de la casa); el
+// Pago mostrado arriba: el real es 1.85x; el
 // Demo es 2x justo. Se muestra el que corresponde al modo en uso.
 function setCoinPayout(demo){
   const el = $("coinPayout");
-  if (el) el.textContent = demo ? `2x ${t("game.coinflip.payoutLabel")} · ${t("bet.demo")}` : `1.6x ${t("game.coinflip.payoutLabel")}`;
+  if (el) el.textContent = demo ? `2x ${t("game.coinflip.payoutLabel")} · ${t("bet.demo")}` : `1.85x ${t("game.coinflip.payoutLabel")}`;
 }
 // Muestra "You win" / "You lose" (o lo borra con null) bajo la moneda y en el panel.
 function showCoinResult(won){
