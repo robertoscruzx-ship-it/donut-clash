@@ -1119,9 +1119,27 @@ function renderAdminStats(stats){
       <td>${g.wins}</td><td>${g.losses}</td><td>${g.forced_losses}</td>
     </tr>`).join("");
   const t2 = stats.totals;
+  const r = stats.reserves || {};
+  const fmt = (n) => (typeof n === "number" ? Math.floor(n).toLocaleString("en-US") : "—");
+  const pct = (n) => (typeof n === "number" ? `${(n * 100).toFixed(1)}%` : "—");
+  const ratio = r.exposure_ratio;
+  const danger = typeof ratio === "number" && r.max_exposure_fraction && ratio >= r.max_exposure_fraction;
+  const reported = r.bot_real_balance_reported_at
+    ? `${t("admin.reportedAt")}: ${new Date(r.bot_real_balance_reported_at).toLocaleString()}`
+    : t("admin.noReport");
+  const card = (label, value, sub = "", cls = "") =>
+    `<div class="admin-card ${cls}"><div class="admin-card-label">${label}</div><div class="admin-card-value">${value}</div>${sub ? `<div class="admin-card-sub">${sub}</div>` : ""}</div>`;
   adminStatsView.innerHTML = `
     <h2>${t("admin.title")}</h2>
-    <p class="muted small">${t("admin.reserve")}: <strong>${Math.floor(stats.house_reserve)}</strong> ${t("donuts")}</p>
+    <div class="admin-cards">
+      ${card(t("admin.profit"), fmt(t2.house_profit), `${t("admin.edge")}: ${pct(t2.observed_house_edge)}`, t2.house_profit < 0 ? "bad" : "good")}
+      ${card(t("admin.botBalance"), fmt(r.bot_real_balance), reported)}
+      ${card(t("admin.circulating"), fmt(r.circulating_donuts_stats_only))}
+      ${card(t("admin.exposure"), pct(ratio), `${t("admin.exposureLimit")}: ${pct(r.max_exposure_fraction)}`, danger ? "bad" : "")}
+      ${card(t("admin.winRate"), pct(t2.win_rate))}
+      ${card(t("admin.forcedRate"), pct(t2.forced_loss_rate))}
+      ${card(t("admin.reserveStats"), fmt(stats.house_reserve))}
+    </div>
     <table class="admin-table">
       <thead><tr>
         <th>${t("admin.game")}</th><th>${t("admin.bets")}</th><th>${t("admin.wagered")}</th><th>${t("admin.paid")}</th>
@@ -1133,7 +1151,6 @@ function renderAdminStats(stats){
         <td>${t2.wins}</td><td>${t2.losses}</td><td>${t2.forced_losses}</td>
       </tr></tfoot>
     </table>
-    <p class="muted small">${t("admin.edge")}: <strong>${(t2.observed_house_edge * 100).toFixed(1)}%</strong></p>
   `;
   adminStatsView.classList.remove("hidden");
 }

@@ -531,3 +531,13 @@ body{
 .admin-table th, .admin-table td{padding:8px 10px; text-align:left; border-bottom:1px solid var(--border); font-size:0.9rem;}
 .admin-table thead th{color:var(--muted); font-weight:700; text-transform:uppercase; font-size:0.7rem;}
 .admin-table tfoot td{font-weight:700; border-top:2px solid var(--border); border-bottom:none;}
+
+/* ===== Panel de stats de la casa ===== */
+.admin-cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; margin:16px 0;}
+.admin-card{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 16px;}
+.admin-card-label{font-size:.72rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;}
+.admin-card-value{font-size:1.6rem; font-weight:800; margin-top:6px;}
+.admin-card-sub{font-size:.75rem; color:var(--muted); margin-top:4px;}
+.admin-card.good .admin-card-value{color:#36d399;}
+.admin-card.bad{border-color:var(--danger);}
+.admin-card.bad .admin-card-value{color:var(--danger);}
