@@ -1051,6 +1051,17 @@ function renderCrash(){
   // Franja de historial ENCIMA de todo el juego (más antiguas se desvanecen a la izquierda).
   crashHistLast = null;
   gameView.querySelector(".game-layout").classList.add("crash-layout");
+  // Panel de apuesta horizontal, entre el gráfico y la tabla: [apuesta] [auto cashout] [botón].
+  (function(){
+    const panel = gameView.querySelector(".bet-panel");
+    const kids = Array.from(panel.children);          // tabs, label, row, label, row, botón
+    const mk = (cls, ...els) => { const d = document.createElement("div"); d.className = cls; els.forEach((e) => d.appendChild(e)); return d; };
+    const grid = mk("bp-grid",
+      mk("bp-field", kids[1], kids[2]),
+      mk("bp-field", kids[3], kids[4]),
+      mk("bp-action", kids[5]));
+    panel.appendChild(grid);
+  })();
   gameView.querySelector(".game-layout").insertAdjacentHTML("beforeend", `<section class="crash-table" id="crashTable"><div class="ct-head"><span id="ctCount"></span><span id="ctTotal"></span></div><div class="ct-body" id="ctBody"></div></section>`);
   gameView.insertAdjacentHTML("afterbegin", '<div class="crash-history" id="crashHistory"></div>');
   gameView.querySelectorAll("[data-at]").forEach((b) => { b.onclick = () => { $("autoAt").value = b.dataset.at; }; });

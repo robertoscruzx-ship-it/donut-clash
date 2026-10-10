@@ -571,8 +571,9 @@ body{
 .win-fly{position:fixed; z-index:9999; pointer-events:none; padding:2px 9px; font-weight:800; font-size:1.05rem; font-variant-numeric:tabular-nums; color:#36d399; background:rgba(54,211,153,.2); border-radius:0; white-space:nowrap;}
 
 .crash-layout .game-stage{grid-column:1; grid-row:1;}
-.crash-layout .bet-panel{grid-column:2; grid-row:1 / span 2;}
-.crash-table{grid-column:1; grid-row:2; background:var(--panel-alt); border:1px solid var(--border); border-radius:12px; overflow:hidden;}
+.crash-layout{grid-template-columns:minmax(0,1fr);}
+.crash-layout .bet-panel{grid-column:1; grid-row:2;}
+.crash-table{grid-column:1; grid-row:3; background:var(--panel-alt); border:1px solid var(--border); border-radius:12px; overflow:hidden;}
 .ct-head{display:flex; justify-content:space-between; align-items:center; padding:12px 16px; font-weight:800; font-size:.95rem;}
 .ct-ingame{color:var(--muted); font-weight:700;}
 .ct-head .coin-icon,.ct-bet .coin-icon{width:16px; height:16px; vertical-align:middle;}
@@ -658,3 +659,12 @@ body{
 .bug-select,.bug-text{width:100%; margin:6px 0 12px; padding:10px; background:#000; border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:.9rem;}
 .bug-text{resize:vertical;}
 .bug-select:focus,.bug-text:focus{outline:none; border-color:var(--accent);}
+
+/* Crash: panel de apuesta en horizontal bajo el gráfico */
+.main-content{min-width:0;}
+.crash-history{max-width:100%;}
+.crash-layout .bet-tabs{max-width:260px;}
+.bp-grid{display:grid; grid-template-columns:1fr 1fr minmax(160px,.7fr); gap:14px; align-items:end;}
+.bp-field{display:flex; flex-direction:column; gap:6px; min-width:0;}
+.bp-action .btn-primary{width:100%;}
+@media (max-width:760px){ .bp-grid{grid-template-columns:1fr;} }
