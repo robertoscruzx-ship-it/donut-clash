@@ -1211,16 +1211,38 @@ async function crashPoll(){
   }
 }
 
+// El servidor pasa a la siguiente ronda de apuestas en el mismo instante del choque,
+// así que el cliente nunca recibe la ronda como "crashed". Para poder mostrar la
+// explosión y el resultado, el cliente "retiene" la ronda que acaba de chocar unos
+// segundos (solo visual; las apuestas de la nueva ronda ya están abiertas).
+const CRASH_HOLD_MS = 3500;
+function crashStartHold(prev){
+  const c = state.crash;
+  if (!c || (c.hold && c.hold.round.round_number === prev.round_number)) return;
+  const secs = Math.max(0, (prev.crash_at - prev.round_start) / 1000);
+  const crash_point = Math.floor(Math.exp(prev.growth_rate * secs) * 100) / 100;
+  const held = { ...prev, status: "crashed", crash_point: Math.max(1, crash_point) };
+  c.hold = { round: held, until: Math.max(Date.now(), prev.crash_at) + CRASH_HOLD_MS };
+  if (c.joined && !c.cashedOut) say(t("game.crash.crashed"));
+  renderCrashTable(held);
+}
+
 function crashApplyState(d){
   const c = state.crash;
   if (!c) return;
   const prevStatus = c.round ? c.round.status : null;
+  if (c.round && c.round.status === "running" && d.round_number !== c.round.round_number) crashStartHold(c.round);
   c.round = d;
   c.joined = !!d.my_bet;
   c.cashedOut = !!(d.my_bet && d.my_bet.cashed_out);
 
   renderCrashHistory(d.history);
-  renderCrashTable(d);
+  if (c.hold) {
+    // Si ya llegó el valor exacto del servidor para la ronda retenida, se usa ese.
+    const hh = (d.history || []).find((x) => x.round_number === c.hold.round.round_number);
+    if (hh) c.hold.round.crash_point = hh.crash_point;
+  }
+  if (!c.hold || Date.now() >= c.hold.until) renderCrashTable(d);
 
   if (d.status === "betting") {
     crashSetFormLocked(c.joined);
@@ -1302,7 +1324,14 @@ function renderCrashHistory(history){
 function crashTick(){
   const c = state.crash;
   if (!c) return;
-  const round = c.round;
+  let round = c.round;
+  if (round && round.status === "running" && Date.now() >= round.crash_at) {
+    crashStartHold(round);
+    if (c.hold) round = c.hold.round;
+  } else if (c.hold) {
+    if (Date.now() < c.hold.until) round = c.hold.round;
+    else { c.hold = null; if (round) renderCrashTable(round); }
+  }
   const multEl = $("crashMult");
   if (round && multEl) {
     if (round.status === "betting") {
