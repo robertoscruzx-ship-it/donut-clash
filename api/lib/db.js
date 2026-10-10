@@ -62,7 +62,13 @@ async function getWithdrawalsCollection() {
   return db.collection("withdrawals");
 }
 
+async function getDepositsCollection() {
+  const db = await connectToDatabase();
+  return db.collection("deposits");
+}
+
 module.exports = {
+  getDepositsCollection,
   connectToDatabase,
   getUsersCollection,
   getMinesGamesCollection,

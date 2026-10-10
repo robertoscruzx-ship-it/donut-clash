@@ -1,7 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const { ObjectId } = require("mongodb");
-const { getUsersCollection, getWithdrawalsCollection } = require("../db");
+const { getUsersCollection, getWithdrawalsCollection, getDepositsCollection } = require("../db");
 const { requireApiKey } = require("../auth");
 const { getUserBySession } = require("../session");
 const { randomServerSeed, hashServerSeed } = require("../fairness");
@@ -156,6 +156,17 @@ router.post("/account-deposit-donuts", requireApiKey, async (req, res) => {
     if (user.status !== "linked") {
       return res.status(400).json({ error: "La cuenta debe estar vinculada antes de depositar donuts." });
     }
+    // Solo se acredita si existe una solicitud de depósito activa.
+    const deposits = await getDepositsCollection();
+    const now = new Date();
+    const request = await deposits.findOneAndUpdate(
+      { minecraft_username: username, status: "pending", expires_at: { $gt: now } },
+      { $set: { status: "completed", paid_amount: depositAmount, completed_at: now } },
+      { returnDocument: "after" }
+    );
+    if (!request) {
+      return res.status(409).json({ error: "No hay solicitud de depósito activa para este usuario. No se acreditó." });
+    }
     const result = await users.findOneAndUpdate(
       { minecraft_username: username },
       { $inc: { balance: depositAmount }, $set: { updated_at: new Date() } },
@@ -164,6 +175,45 @@ router.post("/account-deposit-donuts", requireApiKey, async (req, res) => {
     return res.status(200).json({ minecraft_username: username, balance: result.balance });
   } catch (err) {
     console.error("Error en /account-deposit-donuts:", err);
+    return res.status(500).json({ error: "Error interno del servidor." });
+  }
+});
+
+/**
+ * POST /api/account-deposit-request
+ * Body: { minecraft_username, session_token, amount }
+ * Crea una solicitud de depósito válida por 15 minutos. Sin ella, los pagos
+ * al bot no se acreditan.
+ */
+const MIN_DEPOSIT = 10000;
+const DEPOSIT_TTL_MS = 15 * 60 * 1000;
+
+router.post("/account-deposit-request", async (req, res) => {
+  try {
+    const { minecraft_username, session_token, amount } = req.body || {};
+    const user = await getUserBySession(minecraft_username, session_token);
+    if (!user) return res.status(401).json({ error: "Sesión inválida." });
+    const requestedAmount = Math.floor(Number(amount));
+    if (!Number.isFinite(requestedAmount) || requestedAmount < MIN_DEPOSIT) {
+      return res.status(400).json({ error: `El depósito mínimo es ${MIN_DEPOSIT.toLocaleString("en-US")} donuts.` });
+    }
+    const deposits = await getDepositsCollection();
+    const now = new Date();
+    await deposits.updateMany(
+      { minecraft_username: user.minecraft_username, status: "pending" },
+      { $set: { status: "cancelled" } }
+    );
+    const expires_at = new Date(now.getTime() + DEPOSIT_TTL_MS);
+    await deposits.insertOne({
+      minecraft_username: user.minecraft_username,
+      amount: requestedAmount,
+      status: "pending",
+      created_at: now,
+      expires_at,
+    });
+    return res.status(200).json({ status: "pending", amount: requestedAmount, expires_at });
+  } catch (err) {
+    console.error("Error en /account-deposit-request:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });

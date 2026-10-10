@@ -313,11 +313,22 @@ document.querySelectorAll(".amount-chip").forEach((chip) => {
     depositCommandBox.classList.add("hidden");
   });
 });
-depositContinueBtn.addEventListener("click", () => {
+depositContinueBtn.addEventListener("click", async () => {
   const amt = Math.floor(parseShorthandAmount(depositAmount.value));
   if (!(amt >= MIN_DEPOSIT)) return;
-  depositPayCommand.textContent = `/pay ${BOT_IGN} ${formatShorthand(amt)}`;
-  depositCommandBox.classList.remove("hidden");
+  depositContinueBtn.disabled = true;
+  try {
+    await apiFetch("/account-deposit-request", {
+      method: "POST",
+      body: JSON.stringify({ minecraft_username: state.username, session_token: state.sessionToken, amount: amt }),
+    });
+    depositPayCommand.textContent = `/pay ${BOT_IGN} ${formatShorthand(amt)}`;
+    depositCommandBox.classList.remove("hidden");
+  } catch (e) {
+    showToast(e.message, { type: "error" });
+  } finally {
+    depositContinueBtn.disabled = false;
+  }
 });
 
 // ==============================
