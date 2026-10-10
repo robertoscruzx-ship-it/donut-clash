@@ -790,8 +790,8 @@ function renderCoinflip(){
     `<div class="coin-payout" id="coinPayout"></div><div class="coin-result" id="coinResult"></div><div class="coin-stage"><div class="coin3d" id="coin">${"<i class=\"coin-edge\"></i>".repeat(9)}<i class="coin-face coin-front"></i><i class="coin-face coin-back"></i></div></div>`,
     `<label class="bet-label" data-i18n="game.coinflip.pick">Pick a side</label>
      <div class="bet-row">
-       <button class="chip side active" data-side="heads" data-i18n="game.coinflip.heads">Heads</button>
-       <button class="chip side" data-side="tails" data-i18n="game.coinflip.tails">Tails</button>
+       <button class="chip side active" data-side="heads" data-i18n="game.coinflip.heads">R</button>
+       <button class="chip side" data-side="tails" data-i18n="game.coinflip.tails">-</button>
      </div>`, "bet.placeBet", true);
   coinIdle();
   setCoinPayout(false);
