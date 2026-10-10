@@ -977,6 +977,7 @@ function renderCrash(){
          <g id="crashAxisX"></g>
        </svg>
        <div class="crash-labels" id="crashLabels"></div>
+       <div class="crash-waiting" id="crashWaiting"><div class="cw-text">${t("game.crash.waiting")}</div><div class="cw-timer" id="crashWaitTimer">10.0s</div></div>
        <div class="crash-rocket" id="crashRocket" style="opacity:0"></div>
      </div>
 `,
@@ -1348,12 +1349,19 @@ function crashTick(){
     else { c.hold = null; if (round) renderCrashTable(round); }
   }
   const multEl = $("crashMult");
+  const wrapEl = $("crashWrap");
+  if (wrapEl && round) {
+    const waiting = round.status === "betting";
+    wrapEl.classList.toggle("waiting", waiting);
+    const ttl = wrapEl.previousElementSibling;
+    if (ttl && ttl.classList.contains("stage-title")) ttl.style.visibility = waiting ? "hidden" : "";
+  }
   if (round && multEl) {
     if (round.status === "betting") {
       const secsLeft = Math.max(0, (round.betting_end - Date.now()) / 1000);
       multEl.innerHTML = `1.00<sup>x</sup>`;
       multEl.classList.remove("crashed");
-      $("crashStatusLine").textContent = `${t("game.crash.nextRoundIn")} ${secsLeft.toFixed(1)}s`;
+      $("crashWaitTimer").textContent = `${secsLeft.toFixed(1)}s`;
       crashRenderGraph("betting", round);
     } else if (round.status === "running") {
       const elapsed = Math.max(0, (Date.now() - round.round_start) / 1000);

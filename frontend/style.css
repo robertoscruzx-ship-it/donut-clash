@@ -595,3 +595,11 @@ body{
 .boom-flash{position:absolute; width:90px; height:90px; border-radius:50%; background:radial-gradient(circle,#fff 0%,#ffd23f 35%,rgba(255,106,19,.6) 60%,rgba(255,106,19,0) 75%); pointer-events:none; z-index:3;}
 .boom-ring{position:absolute; width:50px; height:50px; border-radius:50%; border:3px solid #ff9d1a; box-shadow:0 0 14px #ff6a13; pointer-events:none; z-index:3;}
 .boom-spark{position:absolute; border-radius:50%; pointer-events:none; z-index:3;}
+
+/* Espera entre rondas: sin gráfico ni multiplicador, solo mensaje y temporizador grande */
+.crash-waiting{position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:10px; z-index:3; pointer-events:none; text-align:center;}
+.crash-wrap.waiting .crash-waiting{display:flex;}
+.crash-wrap.waiting .crash-svg, .crash-wrap.waiting .crash-labels, .crash-wrap.waiting .crash-readout, .crash-wrap.waiting .crash-rocket, .crash-wrap.waiting .crash-3d{visibility:hidden;}
+.cw-text{font-size:1.1rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted);}
+.cw-timer{font-size:4.5rem; font-weight:800; line-height:1; color:var(--accent); font-variant-numeric:tabular-nums;}
+@media (max-width:600px){ .cw-timer{font-size:3.2rem;} .cw-text{font-size:.9rem;} }
