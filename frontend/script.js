@@ -847,6 +847,13 @@ function renderMines(){
     tile.onclick = () => revealTile(i, tile);
     grid.appendChild(tile);
   }
+  // Caja "Current payout" bajo el panel de apuesta.
+  const aside = gameView.querySelector(".bet-panel");
+  const col = document.createElement("div");
+  col.className = "bet-col";
+  aside.parentNode.insertBefore(col, aside);
+  col.appendChild(aside);
+  col.insertAdjacentHTML("beforeend", `<div class="payout-box"><div class="payout-label"><span data-i18n="game.mines.currentPayout">${t("game.mines.currentPayout")}</span> <span class="payout-mult" id="minesPayMult">- 1.00X</span></div><div class="payout-value"><span class="coin-icon"></span><span id="minesPayVal">0</span></div></div>`);
   $("actionBtn").onclick = () => (state.mines ? minesCashout() : minesStart());
   $("demoBtn").onclick = minesDemoStart;
 }
@@ -862,7 +869,8 @@ function minesDemoStart(){
   const idx = Array.from({ length: 25 }, (_, i) => i);
   const rnd = new Uint32Array(25); crypto.getRandomValues(rnd);
   for (let i = 24; i > 0; i--) { const j = rnd[i] % (i + 1); [idx[i], idx[j]] = [idx[j], idx[i]]; }
-  state.mines = { demo: true, bombsCount: bombs, bombs: new Set(idx.slice(0, bombs)), revealed: 0 };
+  state.mines = { demo: true, bombsCount: bombs, bombs: new Set(idx.slice(0, bombs)), revealed: 0, bet: Math.max(0, Number($("betAmount").value) || 0) };
+  minesSetPayout(1, state.mines.bet);
   gameView.querySelectorAll(".mine-tile").forEach((x) => { x.className = "mine-tile"; x.textContent = ""; });
   lockPanel(true);
   setAction("bet.cashOut");
@@ -874,13 +882,23 @@ async function minesStart(){
   if (bet < 1) return;
   try {
     const d = await call("/games-mines-start", { bet_amount: bet, bombs_count: Number($("bombs").value) || 0, client_seed: getOrCreateClientSeed() });
-    state.mines = { id: d.game_id };
+    state.mines = { id: d.game_id, bet };
+    minesSetPayout(1, bet);
     gameView.querySelectorAll(".mine-tile").forEach((x) => { x.className = "mine-tile"; x.textContent = ""; });
     lockPanel(true);
     setAction("bet.cashOut");
     say("");
     refreshBalance();
   } catch (e) { fail(e); }
+}
+
+// Pago actual (apuesta × multiplicador) en la caja bajo el panel.
+function minesSetPayout(mult, bet){
+  const mEl = $("minesPayMult"), vEl = $("minesPayVal");
+  if (!mEl || !vEl) return;
+  mEl.textContent = `- ${mult.toFixed(2)}X`;
+  const v = bet * mult;
+  vEl.textContent = v >= 1000 ? fmtShort(v) : String(parseFloat(v.toFixed(2)));
 }
 
 // Muestra el contenido de una casilla: esmeralda (segura) o bomba. Si `boom`, la bomba explota.
@@ -937,6 +955,7 @@ async function revealTile(i, tile){
     } else {
       m.revealed += 1;
       minesShow(tile, "safe");
+      minesSetPayout(minesFairMultiplier(m.revealed, m.bombsCount), m.bet);
       say(`${t("bet.demoTag")} ${t("game.mines.multiplierPrefix")}${minesFairMultiplier(m.revealed, m.bombsCount).toFixed(2)}x`);
     }
     return;
@@ -951,6 +970,7 @@ async function revealTile(i, tile){
       endMines(d.bomb_positions);
     } else {
       minesShow(tile, "safe");
+      minesSetPayout(d.current_multiplier, state.mines.bet);
       say(`${t("game.mines.multiplierPrefix")}${d.current_multiplier.toFixed(2)}x` + (d.board_fully_cleared ? t("game.mines.boardCleared") : ""));
     }
   } catch (e) { fail(e); }
@@ -975,6 +995,7 @@ async function minesCashout(){
 
 function endMines(bombs){
   state.mines = null;
+  minesSetPayout(1, 0);
   lockPanel(false);
   setAction("bet.placeBet");
   const tiles = gameView.querySelectorAll(".mine-tile");
