@@ -564,6 +564,5 @@ body{
 
 .coin-payout{position:absolute; top:18px; left:0; right:0; text-align:center; font-size:1.05rem; font-weight:800; letter-spacing:.5px; color:rgba(156,163,175,.7); z-index:2;}
 .btn-primary.waiting:disabled{background:#4b5563; color:#d1d5db; opacity:1; cursor:not-allowed;}
-.coin-won{position:absolute; left:calc(50% + 190px); top:50%; transform:translateY(-50%); font-size:1.9rem; font-weight:800; color:#36d399; opacity:0; transition:opacity .3s; z-index:2; white-space:nowrap;}
-.coin-won.show{opacity:1;}
-.win-fly{position:fixed; z-index:9999; pointer-events:none; padding:4px 14px; font-weight:800; font-size:1.3rem; color:#36d399; background:rgba(54,211,153,.2); border:1px solid rgba(54,211,153,.45); border-radius:0; white-space:nowrap; will-change:transform,opacity;}
+.win-fly{position:fixed; z-index:9999; pointer-events:none; padding:2px 9px; font-weight:800; font-size:1.05rem; font-variant-numeric:tabular-nums; color:#36d399; background:rgba(54,211,153,.2); border:1px solid rgba(54,211,153,.45); border-radius:0; box-shadow:0 0 14px rgba(54,211,153,.45); white-space:nowrap; will-change:transform,opacity;}
+.win-spark{position:fixed; z-index:9999; width:4px; height:4px; background:#36d399; box-shadow:0 0 6px #36d399; pointer-events:none;}

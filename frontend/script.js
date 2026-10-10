@@ -701,33 +701,22 @@ function setCoinPayout(demo){
   if (el) el.textContent = demo ? t("bet.demo") : `1.85x ${t("game.coinflip.payoutLabel")}`;
 }
 // Muestra "You win" / "You lose" (o lo borra con null) bajo la moneda y en el panel.
-let coinResultFade = null, coinSayTimer = null;
+let coinResultFade = null;
 function showCoinResult(won){
   const txt = won === null ? "" : (won ? t("game.coinflip.youWin") : t("game.coinflip.youLose"));
   const el = $("coinResult");
   if (coinResultFade) { coinResultFade.cancel(); coinResultFade = null; }
-  clearTimeout(coinSayTimer);
   if (el) {
     el.textContent = txt; el.className = "coin-result" + (won === null ? "" : won ? " win" : " lose");
     // aparece, se mantiene un momento y se desvanece hasta desaparecer
     if (won !== null && el.animate) {
-      coinResultFade = el.animate([{ opacity: 1 }, { opacity: 1, offset: 0.45 }, { opacity: 0 }], { duration: 1800, easing: "ease-out", fill: "forwards" });
+      coinResultFade = el.animate([{ opacity: 1 }, { opacity: 1, offset: 0.45 }, { opacity: 0 }], { duration: 1400, easing: "ease-out", fill: "forwards" });
     }
   }
-  say(txt);
-  if (won !== null) coinSayTimer = setTimeout(() => say(""), 1800);
-  if (won === null) showCoinWon(0);
 }
 function formatWonAmount(n) {
   const v = Number(n) || 0;
   return Math.abs(v) < 1000 ? v.toFixed(2) : formatCompactBalance(v);
-}
-// Cantidad ganada junto a la moneda (recuadro azul); vacío si no hay premio.
-function showCoinWon(amount){
-  const el = $("coinWon");
-  if (!el) return;
-  el.textContent = amount > 0 ? `+${formatWonAmount(amount)}` : "";
-  el.classList.toggle("show", amount > 0);
 }
 // Anima "+cantidad" apareciendo junto al pago, subiendo con una flecha hasta el
 // saldo del header y desapareciendo. Resuelve cuando termina (ahí se suma el saldo).
@@ -745,14 +734,53 @@ function flyWinToBalance(amount){
   const y0 = a.top + a.height / 2 - h / 2;
   const y1 = b.top + b.height / 2 - h / 2;
   el.style.left = "0"; el.style.top = "0";
+  const T = (y, sc) => `translate(${x}px,${y}px) scale(${sc})`;
   const anim = el.animate([
-    { transform: `translate(${x}px,${y0}px)`, opacity: 0 },
-    { transform: `translate(${x}px,${y0}px)`, opacity: 1, offset: 0.25 },
-    { transform: `translate(${x}px,${y0}px)`, opacity: 1, offset: 0.4 },
-    { transform: `translate(${x}px,${y1}px)`, opacity: 1, offset: 0.9 },
-    { transform: `translate(${x}px,${y1}px)`, opacity: 0 },
-  ], { duration: 1700, easing: "ease-in-out", fill: "forwards" });
-  return anim.finished.catch(() => {}).then(() => el.remove());
+    { transform: T(y0, 0.6), opacity: 0 },
+    { transform: T(y0, 1.12), opacity: 1, offset: 0.16 },
+    { transform: T(y0, 1), opacity: 1, offset: 0.26 },
+    { transform: T(y0, 1), opacity: 1, offset: 0.36 },
+    { transform: T(y1, 0.9), opacity: 1, offset: 0.86 },
+    { transform: T(y1, 0.7), opacity: 0 },
+  ], { duration: 1000, easing: "ease-in-out", fill: "forwards" });
+  return anim.finished.catch(() => {}).then(() => {
+    el.remove();
+    spawnSparks(b.left + b.width / 2, b.top + b.height / 2);
+  });
+}
+// Chispas verdes discretas al llegar al saldo.
+function spawnSparks(cx, cy) {
+  if (!document.body.animate) return;
+  for (let i = 0; i < 8; i++) {
+    const sp = document.createElement("i");
+    sp.className = "win-spark";
+    sp.style.left = `${cx - 2}px`; sp.style.top = `${cy - 2}px`;
+    document.body.appendChild(sp);
+    const ang = (Math.PI * 2 * i) / 8, d = 26 + Math.random() * 8;
+    sp.animate([
+      { transform: "translate(0,0) scale(1)", opacity: 1 },
+      { transform: `translate(${Math.cos(ang) * d}px,${Math.sin(ang) * d}px) scale(.3)`, opacity: 0 },
+    ], { duration: 420, easing: "ease-out" }).finished.catch(() => {}).then(() => sp.remove());
+  }
+}
+// El saldo del header sube hasta el nuevo valor con un destello verde.
+function countUpBalance(to) {
+  const from = state.balance, start = performance.now(), dur = 450;
+  balanceValue.style.display = "inline-block";
+  if (balanceValue.animate) {
+    balanceValue.animate([
+      { transform: "scale(1)", color: "" },
+      { transform: "scale(1.22)", color: "#36d399", offset: 0.35 },
+      { transform: "scale(1)", color: "" },
+    ], { duration: 600, easing: "ease-out" });
+  }
+  const step = (now) => {
+    const k = Math.min(1, (now - start) / dur);
+    state.balance = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3)));
+    updateBalanceDisplay();
+    if (k < 1) requestAnimationFrame(step); else setBalance(to);
+  };
+  requestAnimationFrame(step);
 }
 let coinIdleTimer = null;
 function coinIdle(startDeg = 0){
@@ -779,7 +807,7 @@ function flipCoin(result){
 }
 function renderCoinflip(){
   layout(
-    `<div class="coin-payout" id="coinPayout"></div><div class="coin-result" id="coinResult"></div><div class="coin-won" id="coinWon"></div><div class="coin-stage"><div class="coin3d" id="coin">${"<i class=\"coin-edge\"></i>".repeat(9)}<i class="coin-face coin-front"></i><i class="coin-face coin-back"></i></div></div>`,
+    `<div class="coin-payout" id="coinPayout"></div><div class="coin-result" id="coinResult"></div><div class="coin-stage"><div class="coin3d" id="coin">${"<i class=\"coin-edge\"></i>".repeat(9)}<i class="coin-face coin-front"></i><i class="coin-face coin-back"></i></div></div>`,
     `<label class="bet-label" data-i18n="game.coinflip.pick">Pick a side</label>
      <div class="bet-row">
        <button class="chip side active" data-side="heads" data-i18n="game.coinflip.heads">Heads</button>
@@ -818,10 +846,11 @@ function renderCoinflip(){
       showCoinResult(d.won);
       if (d.won) {
         const won = Math.max(0, d.balance - state.balance + bet);
-        showCoinWon(won);
         await flyWinToBalance(won);
+        countUpBalance(d.balance);
+      } else {
+        setBalance(d.balance);
       }
-      setBalance(d.balance);
     } catch (e) { fail(e); }
     coinBusy = false; $("actionBtn").disabled = false; $("demoBtn").disabled = false;
   };
