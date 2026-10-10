@@ -1126,8 +1126,8 @@ function crashRenderGraph(status, round){
   rocket.style.transform = `translate(-50%,-50%) rotate(${(angle + 45).toFixed(1)}deg)`;
   rocket.textContent = status === "crashed" ? "💥" : "🚀";
   if (c.fx && status === "running") {
-    // Cohete 3D (modelo + llama animada); el emoji queda oculto.
-    rocket.style.opacity = "0";
+    // Llama 3D animada detrás del cohete (el cohete sigue siendo el emoji 🚀).
+    rocket.style.opacity = "1";
     c.fx.draw({
       x: last.x * sx, y: last.y * sy,
       angle: angle * Math.PI / 180,

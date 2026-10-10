@@ -1,13 +1,11 @@
 /**
- * Cohete 3D del juego Crash (WebGL puro, sin librerías).
+ * Llama 3D del cohete de Crash (WebGL puro, sin librerías).
  *
- * Carga dos modelos GLB (assets/rocket.glb y assets/flame.glb), los dibuja con
- * una cámara ortográfica en píxeles encima del gráfico, hace girar el cohete
- * sobre su propio eje mientras sube y anima la llama por código (parpadeo de
- * largo/ancho y brillo; crece un poco con el multiplicador).
+ * Carga el modelo assets/flame.glb, lo dibuja con una cámara ortográfica en
+ * píxeles detrás del emoji 🚀 y lo anima por código (parpadeo de largo/ancho y
+ * brillo; crece un poco con el multiplicador).
  *
- * Si WebGL o los modelos fallan, create() devuelve null y el juego usa el
- * emoji 🚀 como respaldo.
+ * Si WebGL o el modelo fallan, create() devuelve null y el cohete se ve sin llama 3D.
  */
 (function () {
   const VS = `
@@ -97,22 +95,6 @@
   }
   const hex = (h) => [(h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255];
 
-  // Los modelos son malla blanca sin color: se pintan por zonas.
-  function rocketColors(pos) {
-    const col = new Float32Array(pos.length);
-    const BODY = hex(0xf1f5f9), RED = hex(0xef4444), WIN = hex(0x38bdf8), DARK = hex(0x475569);
-    for (let i = 0; i < pos.length; i += 3) {
-      const x = pos[i], y = pos[i + 1], z = pos[i + 2];
-      const r = Math.hypot(y, z);
-      let c = BODY;
-      if (x > 0.85) c = RED;                       // punta
-      else if (r > 0.68 && x < -0.15) c = RED;     // aletas
-      else if (z > 0.38 && Math.abs(x) < 0.5 && r > 0.4) c = WIN; // ventana
-      else if (x < -0.78) c = DARK;                // tobera
-      col.set(c, i);
-    }
-    return col;
-  }
   // La llama: base clara/amarilla -> naranja -> rojo en la punta (x=0 es la base).
   function flameColors(pos, length) {
     const col = new Float32Array(pos.length);
@@ -129,8 +111,7 @@
   let modelsPromise = null;
   function loadModels() {
     if (!modelsPromise) {
-      modelsPromise = Promise.all([loadGlb("assets/rocket.glb"), loadGlb("assets/flame.glb")]).then(([rk, fl]) => {
-        rotateAxisToX(rk.pos);
+      modelsPromise = loadGlb("assets/flame.glb").then((fl) => {
         rotateAxisToX(fl.pos);
         // La base de la llama (extremo redondeado, el de x máximo) pasa a x = 0.
         let fmax = -Infinity, fmin = Infinity;
@@ -138,7 +119,6 @@
         for (let i = 0; i < fl.pos.length; i += 3) fl.pos[i] -= fmax;
         const flameLen = fmax - fmin;
         return {
-          rocket: { pos: rk.pos, idx: rk.idx, nrm: computeNormals(rk.pos, rk.idx), col: rocketColors(rk.pos) },
           flame: { pos: fl.pos, idx: fl.idx, nrm: computeNormals(fl.pos, fl.idx), col: flameColors(fl.pos, flameLen), len: flameLen },
         };
       });
@@ -181,7 +161,7 @@
       idx: mkBuf(gl.ELEMENT_ARRAY_BUFFER, m.idx), count: m.idx.length,
       type: m.idx instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT,
     });
-    const rocket = mesh(models.rocket), flame = mesh(models.flame);
+    const flame = mesh(models.flame);
 
     gl.enable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
@@ -211,7 +191,8 @@
       gl.drawElements(gl.TRIANGLES, m.count, m.type, 0);
     }
 
-    const SIZE = 34; // píxeles por unidad del modelo (cohete ~75 px de largo)
+    const SIZE = 30;      // píxeles por unidad del modelo de la llama
+    const BASE_BACK = 13; // la base de la llama queda este nº de px detrás del centro del cohete
     return {
       canvas,
       hide() { fit(); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); },
@@ -220,20 +201,15 @@
         fit();
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         const base = mul(translate(x, H - y, 0), rotZ(-angle));
-        const roll = rotX(time * 3.2); // vueltas sobre su propio eje
+        const roll = rotX(time * 3.2);
         const rot = mul(rotZ(-angle), roll);
-        const R = mul(mul(base, roll), scale(SIZE, SIZE, SIZE));
-        R.rotOnly = rot;
-        drawMesh(rocket, R, 1, 1, 1);
-
         // Llama: parpadea en largo y ancho; crece un poco con el multiplicador.
         const k = Math.min(1, Math.log(Math.max(1, mult)) / Math.log(20));
         const f1 = Math.sin(time * 31) * 0.5 + Math.sin(time * 17.3 + 1.1) * 0.5;
         const f2 = Math.sin(time * 23 + 2.3) * 0.5 + Math.sin(time * 41 + 0.4) * 0.5;
         const len = (0.5 + 0.4 * k) * (1 + 0.16 * f1);
         const wid = (0.5 + 0.18 * k) * (1 + 0.1 * f2);
-        const tailX = -0.72; // el rocket termina en x ~ -0.9; la llama se mete un poco bajo la tobera
-        const F = mul(mul(mul(base, roll), scale(SIZE, SIZE, SIZE)), mul(translate(tailX, 0, 0), scale(len, wid, wid)));
+        const F = mul(mul(mul(base, translate(-BASE_BACK, 0, 0)), roll), mul(scale(SIZE, SIZE, SIZE), scale(len, wid, wid)));
         F.rotOnly = rot;
         drawMesh(flame, F, 0, 0.9 + 0.22 * (0.5 + 0.5 * f2), 0.95);
       },
