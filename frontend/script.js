@@ -954,7 +954,7 @@ function endMines(bombs){
 // Dimensiones internas del gráfico (unidades del viewBox, no píxeles reales
 // — el SVG escala solo). Dejan espacio a la derecha/abajo para las
 // etiquetas de los ejes.
-const CRASH_GRAPH = { left: 10, top: 16, right: 54, bottom: 90, width: 1000, height: 480 };
+const CRASH_GRAPH = { left: 10, top: 16, right: 54, bottom: 40, width: 1000, height: 480 };
 
 function renderCrash(){
   layout(
@@ -978,13 +978,14 @@ function renderCrash(){
          <text id="crashRocket" class="crash-rocket" x="0" y="0" style="opacity:0">🚀</text>
        </svg>
      </div>
-     <div class="crash-history" id="crashHistory"></div>
      <div class="crash-players muted small" id="crashPlayers"></div>`,
     `<label class="bet-label" data-i18n="bet.autoCashout">Auto Cashout</label>
      <div class="bet-row">
        <input type="number" id="autoAt" min="1.01" step="0.01" placeholder="—">
        <button class="chip" data-at="2">2x</button><button class="chip" data-at="10">10x</button>
      </div>`, "game.crash.join");
+  // Franja de historial ENCIMA de todo el juego (más antiguas se desvanecen a la izquierda).
+  gameView.insertAdjacentHTML("afterbegin", '<div class="crash-history" id="crashHistory"></div>');
   gameView.querySelectorAll("[data-at]").forEach((b) => { b.onclick = () => { $("autoAt").value = b.dataset.at; }; });
   $("actionBtn").onclick = crashAction;
 

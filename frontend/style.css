@@ -442,8 +442,8 @@ body{
 .game-stage .mines-grid{margin-top:56px;}
 .game-stage .coin{margin-top:120px; font-size:5rem;}
 .crash-players{position:absolute; top:14px; right:18px; font-size:.75rem; z-index:2;}
-.crash-history{position:absolute; bottom:16px; left:0; right:0; display:flex; justify-content:center; gap:6px; flex-wrap:wrap; padding:0 16px; z-index:2;}
-.crash-chip{font-size:.75rem; font-weight:700; padding:4px 8px; border-radius:6px; background:var(--panel-alt); border:1px solid var(--border); color:var(--text);}
+.crash-history{display:flex; justify-content:flex-end; gap:6px; flex-wrap:nowrap; overflow:hidden; margin-bottom:14px; padding:2px 0; -webkit-mask-image:linear-gradient(to right,transparent 0,#000 14%,#000 94%,transparent 100%); mask-image:linear-gradient(to right,transparent 0,#000 14%,#000 94%,transparent 100%);}
+.crash-chip{flex:0 0 auto; font-size:.75rem; font-weight:700; padding:4px 8px; border-radius:6px; background:var(--panel-alt); border:1px solid var(--border); color:var(--text);}
 .crash-chip.win{color:#36d399; border-color:#36d399;}
 .crash-chip.lose{color:var(--danger); border-color:var(--danger);}
 

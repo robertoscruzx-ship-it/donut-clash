@@ -223,7 +223,7 @@ router.post("/games-crash-state", async (req, res) => {
   try {
     const { minecraft_username } = req.body || {};
     const round = await getCurrentRound();
-    const history = await getRecentCrashHistory(10);
+    const history = await getRecentCrashHistory(20);
     return res.status(200).json({ ...toPublicRound(round, minecraft_username), history });
   } catch (err) {
     console.error("Error en /games-crash-state:", err);
@@ -245,7 +245,7 @@ router.post("/games-crash-join", async (req, res) => {
     if (!Number.isFinite(bet) || bet <= 0) return res.status(400).json({ error: "bet_amount inválido." });
 
     const round = await joinCurrentRound(minecraft_username, session_token, bet);
-    const history = await getRecentCrashHistory(10);
+    const history = await getRecentCrashHistory(20);
     return res.status(200).json({ ...toPublicRound(round, minecraft_username), history });
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
