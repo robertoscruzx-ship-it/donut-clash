@@ -4,7 +4,7 @@ const { MAX_EXPOSURE_FRACTION } = require("./houseEdge");
 
 /**
  * ============================================================
- * MODO DEMOSTRATIVO / EDUCATIVO — Donut Clash
+ * MODO DEMOSTRATIVO / EDUCATIVO — Donut Royale
  * ============================================================
  * Este proyecto se usa como material para una charla/presentación sobre
  * cómo funcionan (y se pueden manipular) los juegos de azar. La moneda

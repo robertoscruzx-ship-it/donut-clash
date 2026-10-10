@@ -1,4 +1,4 @@
-# 🍩 Donut Clash
+# 🍩 Donut Royale
 
 Sitio de "casino" con moneda virtual (**donuts**, sin valor monetario real) que se integra
 con un bot de Minecraft para vincular cuentas y depositar saldo.
