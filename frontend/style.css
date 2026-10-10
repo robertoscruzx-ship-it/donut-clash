@@ -600,6 +600,6 @@ body{
 .crash-waiting{position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:10px; z-index:3; pointer-events:none; text-align:center;}
 .crash-wrap.waiting .crash-waiting{display:flex;}
 .crash-wrap.waiting .crash-svg, .crash-wrap.waiting .crash-labels, .crash-wrap.waiting .crash-readout, .crash-wrap.waiting .crash-rocket, .crash-wrap.waiting .crash-3d{visibility:hidden;}
-.cw-text{font-size:1.1rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted);}
-.cw-timer{font-size:4.5rem; font-weight:800; line-height:1; color:var(--accent); font-variant-numeric:tabular-nums;}
-@media (max-width:600px){ .cw-timer{font-size:3.2rem;} .cw-text{font-size:.9rem;} }
+.cw-text{font-size:2.2rem; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--accent);}
+.cw-timer{font-size:1.8rem; font-weight:700; line-height:1; color:var(--muted); font-variant-numeric:tabular-nums;}
+@media (max-width:600px){ .cw-timer{font-size:1.4rem;} .cw-text{font-size:1.5rem;} }
