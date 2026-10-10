@@ -160,12 +160,12 @@ router.post("/account-deposit-donuts", requireApiKey, async (req, res) => {
     const deposits = await getDepositsCollection();
     const now = new Date();
     const request = await deposits.findOneAndUpdate(
-      { minecraft_username: username, status: "pending", expires_at: { $gt: now } },
+      { minecraft_username: username, status: "pending", amount: depositAmount, expires_at: { $gt: now } },
       { $set: { status: "completed", paid_amount: depositAmount, completed_at: now } },
       { returnDocument: "after" }
     );
     if (!request) {
-      return res.status(409).json({ error: "No hay solicitud de depósito activa para este usuario. No se acreditó." });
+      return res.status(409).json({ error: "No hay solicitud de depósito activa con ese monto exacto. No se acreditó." });
     }
     const result = await users.findOneAndUpdate(
       { minecraft_username: username },
@@ -199,10 +199,15 @@ router.post("/account-deposit-request", async (req, res) => {
     }
     const deposits = await getDepositsCollection();
     const now = new Date();
-    await deposits.updateMany(
-      { minecraft_username: user.minecraft_username, status: "pending" },
-      { $set: { status: "cancelled" } }
-    );
+    const active = await deposits.findOne({
+      minecraft_username: user.minecraft_username, status: "pending", expires_at: { $gt: now },
+    });
+    if (active) {
+      return res.status(409).json({
+        error: "Ya tienes una solicitud de depósito activa. Espera a que se pague o expire.",
+        amount: active.amount, expires_at: active.expires_at,
+      });
+    }
     const expires_at = new Date(now.getTime() + DEPOSIT_TTL_MS);
     await deposits.insertOne({
       minecraft_username: user.minecraft_username,
@@ -214,6 +219,29 @@ router.post("/account-deposit-request", async (req, res) => {
     return res.status(200).json({ status: "pending", amount: requestedAmount, expires_at });
   } catch (err) {
     console.error("Error en /account-deposit-request:", err);
+    return res.status(500).json({ error: "Error interno del servidor." });
+  }
+});
+
+/**
+ * POST /api/account-deposit-status
+ * Body: { minecraft_username, session_token }
+ * Devuelve la solicitud de depósito activa (o null).
+ */
+router.post("/account-deposit-status", async (req, res) => {
+  try {
+    const { minecraft_username, session_token } = req.body || {};
+    const user = await getUserBySession(minecraft_username, session_token);
+    if (!user) return res.status(401).json({ error: "Sesión inválida." });
+    const deposits = await getDepositsCollection();
+    const active = await deposits.findOne({
+      minecraft_username: user.minecraft_username, status: "pending", expires_at: { $gt: new Date() },
+    });
+    return res.status(200).json({
+      pending: active ? { amount: active.amount, expires_at: active.expires_at } : null,
+    });
+  } catch (err) {
+    console.error("Error en /account-deposit-status:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });

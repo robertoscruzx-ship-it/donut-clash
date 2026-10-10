@@ -276,9 +276,11 @@ async function renderWalletView(){
   depositFromName.textContent = state.username;
   depositBotAvatar.src = `https://mc-heads.net/avatar/${BOT_IGN}/48`;
   depositBotName.textContent = BOT_IGN;
+  depositSetPending(null);
   depositAmount.value = "";
   depositContinueBtn.disabled = true;
   depositCommandBox.classList.add("hidden");
+  depositCheck();
 
   // --- Withdraw panel ---
   withdrawBotAvatar.src = `https://mc-heads.net/avatar/${BOT_IGN}/48`;
@@ -308,26 +310,85 @@ depositAmount.addEventListener("input", () => {
 });
 document.querySelectorAll(".amount-chip").forEach((chip) => {
   chip.addEventListener("click", () => {
+    if (depositPending) return;
     depositAmount.value = chip.dataset.amount;
     depositContinueBtn.disabled = false;
     depositCommandBox.classList.add("hidden");
   });
 });
+let depositTimer = null;
+let depositPollTimer = null;
+let depositPending = null; // { amount, expires_at(ms) }
+
+function stopDepositWatch() {
+  clearInterval(depositTimer); clearInterval(depositPollTimer);
+  depositTimer = depositPollTimer = null;
+}
+function depositRenderTimer() {
+  if (!depositPending) return;
+  const left = Math.max(0, depositPending.expires_at - Date.now());
+  const m = Math.floor(left / 60000), sec = String(Math.floor((left % 60000) / 1000)).padStart(2, "0");
+  depositContinueBtn.textContent = `${t("deposit.waiting")} ${m}:${sec}`;
+  if (left <= 0) depositCheck();
+}
+function depositSetPending(p) {
+  stopDepositWatch();
+  depositPending = p ? { amount: p.amount, expires_at: new Date(p.expires_at).getTime() } : null;
+  if (!p) {
+    depositContinueBtn.textContent = t("deposit.continue");
+    depositContinueBtn.classList.remove("waiting");
+    depositAmount.disabled = false;
+    depositContinueBtn.disabled = !(Math.floor(parseShorthandAmount(depositAmount.value)) >= MIN_DEPOSIT);
+    return;
+  }
+  depositAmount.value = formatShorthand(p.amount);
+  depositAmount.disabled = true;
+  depositContinueBtn.disabled = true;
+  depositContinueBtn.classList.add("waiting");
+  depositPayCommand.textContent = `/pay ${BOT_IGN} ${formatShorthand(p.amount)}`;
+  depositCommandBox.classList.remove("hidden");
+  depositRenderTimer();
+  depositTimer = setInterval(depositRenderTimer, 1000);
+  depositPollTimer = setInterval(depositCheck, 3000);
+}
+async function depositCheck() {
+  if (!state.username || !state.sessionToken) return stopDepositWatch();
+  try {
+    const data = await apiFetch("/account-deposit-status", {
+      method: "POST",
+      body: JSON.stringify({ minecraft_username: state.username, session_token: state.sessionToken }),
+    });
+    if (data.pending) {
+      if (!depositPending) depositSetPending(data.pending);
+      return;
+    }
+    const wasPending = !!depositPending;
+    depositSetPending(null);
+    if (wasPending) {
+      const before = state.balance;
+      await refreshBalance();
+      if (state.balance > before) showToast(t("deposit.credited"), { type: "info" });
+      else showToast(t("deposit.expired"), { type: "error" });
+      depositAmount.value = "";
+      depositContinueBtn.disabled = true;
+      depositCommandBox.classList.add("hidden");
+    }
+  } catch (e) { /* reintenta en el siguiente ciclo */ }
+}
 depositContinueBtn.addEventListener("click", async () => {
   const amt = Math.floor(parseShorthandAmount(depositAmount.value));
-  if (!(amt >= MIN_DEPOSIT)) return;
+  if (!(amt >= MIN_DEPOSIT) || depositPending) return;
   depositContinueBtn.disabled = true;
   try {
-    await apiFetch("/account-deposit-request", {
+    const data = await apiFetch("/account-deposit-request", {
       method: "POST",
       body: JSON.stringify({ minecraft_username: state.username, session_token: state.sessionToken, amount: amt }),
     });
-    depositPayCommand.textContent = `/pay ${BOT_IGN} ${formatShorthand(amt)}`;
-    depositCommandBox.classList.remove("hidden");
+    depositSetPending(data);
   } catch (e) {
     showToast(e.message, { type: "error" });
-  } finally {
     depositContinueBtn.disabled = false;
+    depositCheck();
   }
 });
 
