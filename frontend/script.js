@@ -698,21 +698,35 @@ let coinBusy = false;
 // Demo es 2x justo. Se muestra el que corresponde al modo en uso.
 function setCoinPayout(demo){
   const el = $("coinPayout");
-  if (el) el.textContent = demo ? `2x ${t("game.coinflip.payoutLabel")} · ${t("bet.demo")}` : `1.85x ${t("game.coinflip.payoutLabel")}`;
+  if (el) el.textContent = demo ? t("bet.demo") : `1.85x ${t("game.coinflip.payoutLabel")}`;
 }
 // Muestra "You win" / "You lose" (o lo borra con null) bajo la moneda y en el panel.
+let coinResultFade = null, coinSayTimer = null;
 function showCoinResult(won){
   const txt = won === null ? "" : (won ? t("game.coinflip.youWin") : t("game.coinflip.youLose"));
   const el = $("coinResult");
-  if (el) { el.textContent = txt; el.className = "coin-result" + (won === null ? "" : won ? " win" : " lose"); }
+  if (coinResultFade) { coinResultFade.cancel(); coinResultFade = null; }
+  clearTimeout(coinSayTimer);
+  if (el) {
+    el.textContent = txt; el.className = "coin-result" + (won === null ? "" : won ? " win" : " lose");
+    // aparece, se mantiene un momento y se desvanece hasta desaparecer
+    if (won !== null && el.animate) {
+      coinResultFade = el.animate([{ opacity: 1 }, { opacity: 1, offset: 0.45 }, { opacity: 0 }], { duration: 1800, easing: "ease-out", fill: "forwards" });
+    }
+  }
   say(txt);
+  if (won !== null) coinSayTimer = setTimeout(() => say(""), 1800);
   if (won === null) showCoinWon(0);
+}
+function formatWonAmount(n) {
+  const v = Number(n) || 0;
+  return Math.abs(v) < 1000 ? v.toFixed(2) : formatCompactBalance(v);
 }
 // Cantidad ganada junto a la moneda (recuadro azul); vacío si no hay premio.
 function showCoinWon(amount){
   const el = $("coinWon");
   if (!el) return;
-  el.textContent = amount > 0 ? `+${formatCompactBalance(amount)}` : "";
+  el.textContent = amount > 0 ? `+${formatWonAmount(amount)}` : "";
   el.classList.toggle("show", amount > 0);
 }
 // Anima "+cantidad" apareciendo junto al pago, subiendo con una flecha hasta el
@@ -723,29 +737,34 @@ function flyWinToBalance(amount){
   const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
   const el = document.createElement("div");
   el.className = "win-fly";
-  el.innerHTML = `<i class="win-fly-arrow">▲</i><span>+${formatCompactBalance(amount)}</span>`;
+  el.textContent = `+${formatWonAmount(amount)}`;
   document.body.appendChild(el);
   const w = el.offsetWidth, h = el.offsetHeight;
-  const x0 = a.left + a.width / 2 + 130 - w / 2, y0 = a.top + a.height / 2 - h / 2;
-  const x1 = b.left + b.width / 2 - w / 2, y1 = b.top + b.height / 2 - h / 2;
+  // Trayecto totalmente vertical: misma X (centro del saldo) de inicio a fin.
+  const x = b.left + b.width / 2 - w / 2;
+  const y0 = a.top + a.height / 2 - h / 2;
+  const y1 = b.top + b.height / 2 - h / 2;
   el.style.left = "0"; el.style.top = "0";
   const anim = el.animate([
-    { transform: `translate(${x0}px,${y0}px) scale(.6)`, opacity: 0 },
-    { transform: `translate(${x0}px,${y0}px) scale(1)`, opacity: 1, offset: 0.25 },
-    { transform: `translate(${x0}px,${y0}px) scale(1)`, opacity: 1, offset: 0.4 },
-    { transform: `translate(${x1}px,${y1}px) scale(.8)`, opacity: 1, offset: 0.9 },
-    { transform: `translate(${x1}px,${y1}px) scale(.5)`, opacity: 0 },
+    { transform: `translate(${x}px,${y0}px)`, opacity: 0 },
+    { transform: `translate(${x}px,${y0}px)`, opacity: 1, offset: 0.25 },
+    { transform: `translate(${x}px,${y0}px)`, opacity: 1, offset: 0.4 },
+    { transform: `translate(${x}px,${y1}px)`, opacity: 1, offset: 0.9 },
+    { transform: `translate(${x}px,${y1}px)`, opacity: 0 },
   ], { duration: 1700, easing: "ease-in-out", fill: "forwards" });
   return anim.finished.catch(() => {}).then(() => el.remove());
 }
-function coinIdle(){
+let coinIdleTimer = null;
+function coinIdle(startDeg = 0){
   const el = $("coin");
   if (!el || !el.animate) return;
-  coinAnim = el.animate([{ transform: "rotateY(0deg)" }, { transform: "rotateY(360deg)" }], { duration: 6000, iterations: Infinity });
+  if (coinAnim) coinAnim.cancel();
+  coinAnim = el.animate([{ transform: `rotateY(${startDeg}deg)` }, { transform: `rotateY(${startDeg + 360}deg)` }], { duration: 6000, iterations: Infinity });
 }
 function flipCoin(result){
   const el = $("coin");
   if (!el || !el.animate) return Promise.resolve();
+  clearTimeout(coinIdleTimer);
   if (coinAnim) coinAnim.cancel();
   const end = (result === "heads" ? 0 : 180) + 360 * 6;
   coinAnim = el.animate(
@@ -754,6 +773,8 @@ function flipCoin(result){
   return coinAnim.finished.then(() => {
     el.style.transform = `rotateY(${result === "heads" ? 0 : 180}deg)`;
     coinAnim.cancel(); coinAnim = null;
+    // Tras apostar, la moneda vuelve a girar lento (desde la cara en que aterrizó).
+    coinIdleTimer = setTimeout(() => coinIdle(result === "heads" ? 0 : 180), 1200);
   }).catch(() => {});
 }
 function renderCoinflip(){
