@@ -959,7 +959,7 @@ const CRASH_GRAPH = { left: 10, top: 16, right: 54, bottom: 40, width: 1000, hei
 function renderCrash(){
   layout(
     `<div class="stage-title">📈 <span data-i18n="game.crash.name">Crash</span></div>
-     <div class="crash-wrap">
+     <div class="crash-wrap" id="crashWrap">
        <div class="crash-readout">
          <div class="crash-display" id="crashMult">1.00<sup>x</sup></div>
          <div class="crash-sub" id="crashStatusLine" data-i18n="game.crash.currentPayout">CURRENT PAYOUT</div>
@@ -995,6 +995,14 @@ function renderCrash(){
 
   state.crash = { round: null, joined: false, cashedOut: false, auto: 0, busy: false, raf: null, pollHandle: null };
   state.cleanupGame = crashStop;
+  if (window.Crash3D) {
+    const cs = state.crash;
+    Crash3D.create($("crashWrap")).then((fx) => {
+      if (!fx) return;
+      if (state.crash !== cs) { fx.destroy(); return; } // ya se salió de Crash
+      cs.fx = fx;
+    }).catch(() => {});
+  }
   crashRenderGraph("betting", null);
   crashPoll();
   state.crash.pollHandle = setInterval(crashPoll, 1000);
@@ -1072,6 +1080,7 @@ function crashRenderGraph(status, round){
   const plotW = g.width - g.left - g.right;
   const plotH = g.height - g.top - g.bottom;
   const baselineY = g.top + plotH;
+  const now = performance.now();
   const running = round && (status === "running" || status === "crashed");
   const rate = running ? round.growth_rate : 0;
   const elapsed = !running ? 0 : (status === "crashed"
@@ -1089,6 +1098,7 @@ function crashRenderGraph(status, round){
     area.setAttribute("d", "");
     rocket.style.opacity = "0";
     svg.classList.remove("crashed");
+    if (c.fx) c.fx.hide();
     return;
   }
 
@@ -1115,7 +1125,18 @@ function crashRenderGraph(status, round){
   rocket.style.top = `${(last.y / g.height * 100).toFixed(3)}%`;
   rocket.style.transform = `translate(-50%,-50%) rotate(${(angle + 45).toFixed(1)}deg)`;
   rocket.textContent = status === "crashed" ? "💥" : "🚀";
-  rocket.style.opacity = "1";
+  if (c.fx && status === "running") {
+    // Cohete 3D (modelo + llama animada); el emoji queda oculto.
+    rocket.style.opacity = "0";
+    c.fx.draw({
+      x: last.x * sx, y: last.y * sy,
+      angle: angle * Math.PI / 180,
+      mult: currentM, time: now / 1000,
+    });
+  } else {
+    if (c.fx) c.fx.hide();
+    rocket.style.opacity = "1";
+  }
 }
 
 // Deja de sondear/animar. Se llama al salir de la pantalla de Crash — la
@@ -1125,6 +1146,7 @@ function crashStop(){
   if (!c) return;
   if (c.pollHandle) { clearInterval(c.pollHandle); c.pollHandle = null; }
   if (c.raf) { cancelAnimationFrame(c.raf); c.raf = null; }
+  if (c.fx) { c.fx.destroy(); c.fx = null; }
 }
 
 // Habilita/deshabilita el formulario de apuesta (no bloquea la navegación:
