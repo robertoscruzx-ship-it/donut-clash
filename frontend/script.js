@@ -1211,11 +1211,9 @@ async function crashPoll(){
   }
 }
 
-// El servidor pasa a la siguiente ronda de apuestas en el mismo instante del choque,
-// así que el cliente nunca recibe la ronda como "crashed". Para poder mostrar la
-// explosión y el resultado, el cliente "retiene" la ronda que acaba de chocar unos
-// segundos (solo visual; las apuestas de la nueva ronda ya están abiertas).
-const CRASH_HOLD_MS = 3500;
+// El servidor mantiene la ronda como "crashed" 4s y luego abre 10s de apuestas. El cliente
+// retiene la vista del choque hasta crash_at + 4s (coincide con el servidor) para la explosión.
+const CRASH_HOLD_MS = 4000;
 function crashStartHold(prev){
   const c = state.crash;
   if (!c || (c.hold && c.hold.round.round_number === prev.round_number)) return;

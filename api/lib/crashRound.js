@@ -44,6 +44,9 @@ const { getUserBySession } = require("./session");
 const { xpForBet, levelInfo } = require("./xp");
 
 const BETTING_WINDOW_MS = 10000;
+// Tras el choque la ronda se queda visible como "crashed" este tiempo (explosión,
+// resultados) antes de abrir la siguiente ventana de apuestas de 10 s.
+const CRASH_DISPLAY_MS = 4000;
 const CRASH_CLIENT_SEED = "global-crash-round";
 const MAX_CATCHUP_ITERATIONS = 25;
 
@@ -51,14 +54,14 @@ function timeToCrashMs(crashPoint) {
   return (Math.log(crashPoint) / GROWTH_RATE) * 1000;
 }
 
-async function createBettingRound() {
+async function createBettingRound(startAt) {
   const rounds = await getCrashRoundsCollection();
   const round_number = await nextCrashRoundNumber();
   const server_seed = randomServerSeed();
   const server_seed_hash = hashServerSeed(server_seed);
   const roll = fairFloat(server_seed, CRASH_CLIENT_SEED, round_number);
   const fair_crash_point = crashPointFromRoll(roll, HOUSE_EDGE, CRASH_MAX_MULTIPLIER);
-  const now = Date.now();
+  const now = startAt || Date.now();
 
   const doc = {
     round_number,
@@ -105,8 +108,9 @@ async function lockRound(round) {
   );
 }
 
-// Marca la ronda como explotada, liquida (como pérdida) a quien no haya
-// retirado a tiempo, y abre la siguiente ronda de apuestas de inmediato.
+// Marca la ronda como explotada y liquida (como pérdida) a quien no haya
+// retirado a tiempo. La siguiente ronda de apuestas se abre CRASH_DISPLAY_MS
+// después (ver getCurrentRound).
 async function crashRoundAndAdvance(round) {
   const rounds = await getCrashRoundsCollection();
   const crashed = await rounds.findOneAndUpdate(
@@ -129,7 +133,25 @@ async function crashRoundAndAdvance(round) {
     }
   }
 
-  return createBettingRound();
+  return crashed;
+}
+
+// Abre la siguiente ronda de apuestas una vez pasado el tiempo de mostrar el
+// choque. Solo una petición lo hace (marca atómica "advanced").
+async function advanceFromCrashed(round) {
+  const rounds = await getCrashRoundsCollection();
+  const claimed = await rounds.findOneAndUpdate(
+    { _id: round._id, status: "crashed", advanced: { $ne: true } },
+    { $set: { advanced: true } },
+    { returnDocument: "after" }
+  );
+  if (!claimed) return null;
+  const now = Date.now();
+  const planned = round.crashed_at + CRASH_DISPLAY_MS;
+  // Si nadie miró el juego en mucho tiempo, no se "repone" el pasado: la
+  // nueva ronda arranca ahora.
+  const startAt = now > planned + BETTING_WINDOW_MS ? now : planned;
+  return createBettingRound(startAt);
 }
 
 // Punto de entrada principal: siempre devuelve la ronda "actual", poniendo
@@ -150,6 +172,12 @@ async function getCurrentRound() {
     if (round.status === "running" && now >= round.crash_at) {
       const next = await crashRoundAndAdvance(round);
       round = next || (await rounds.findOne({}, { sort: { round_number: -1 } }));
+      continue;
+    }
+    if (round.status === "crashed" && now >= round.crashed_at + CRASH_DISPLAY_MS) {
+      const next = await advanceFromCrashed(round);
+      round = next || (await rounds.findOne({}, { sort: { round_number: -1 } }));
+      if (round.status === "crashed") break; // otra petición lo está abriendo; se verá en el siguiente sondeo
       continue;
     }
     break;
