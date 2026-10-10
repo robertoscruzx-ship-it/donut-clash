@@ -706,6 +706,37 @@ function showCoinResult(won){
   const el = $("coinResult");
   if (el) { el.textContent = txt; el.className = "coin-result" + (won === null ? "" : won ? " win" : " lose"); }
   say(txt);
+  if (won === null) showCoinWon(0);
+}
+// Cantidad ganada junto a la moneda (recuadro azul); vacío si no hay premio.
+function showCoinWon(amount){
+  const el = $("coinWon");
+  if (!el) return;
+  el.textContent = amount > 0 ? `+${formatCompactBalance(amount)}` : "";
+  el.classList.toggle("show", amount > 0);
+}
+// Anima "+cantidad" apareciendo junto al pago, subiendo con una flecha hasta el
+// saldo del header y desapareciendo. Resuelve cuando termina (ahí se suma el saldo).
+function flyWinToBalance(amount){
+  const from = $("coinPayout"), to = balanceValue;
+  if (!from || !to || !document.body.animate) return Promise.resolve();
+  const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+  const el = document.createElement("div");
+  el.className = "win-fly";
+  el.innerHTML = `<i class="win-fly-arrow">▲</i><span>+${formatCompactBalance(amount)}</span>`;
+  document.body.appendChild(el);
+  const w = el.offsetWidth, h = el.offsetHeight;
+  const x0 = a.left + a.width / 2 + 130 - w / 2, y0 = a.top + a.height / 2 - h / 2;
+  const x1 = b.left + b.width / 2 - w / 2, y1 = b.top + b.height / 2 - h / 2;
+  el.style.left = "0"; el.style.top = "0";
+  const anim = el.animate([
+    { transform: `translate(${x0}px,${y0}px) scale(.6)`, opacity: 0 },
+    { transform: `translate(${x0}px,${y0}px) scale(1)`, opacity: 1, offset: 0.25 },
+    { transform: `translate(${x0}px,${y0}px) scale(1)`, opacity: 1, offset: 0.4 },
+    { transform: `translate(${x1}px,${y1}px) scale(.8)`, opacity: 1, offset: 0.9 },
+    { transform: `translate(${x1}px,${y1}px) scale(.5)`, opacity: 0 },
+  ], { duration: 1700, easing: "ease-in-out", fill: "forwards" });
+  return anim.finished.catch(() => {}).then(() => el.remove());
 }
 function coinIdle(){
   const el = $("coin");
@@ -727,7 +758,7 @@ function flipCoin(result){
 }
 function renderCoinflip(){
   layout(
-    `<div class="coin-payout" id="coinPayout"></div><div class="coin-result" id="coinResult"></div><div class="coin-stage"><div class="coin3d" id="coin">${"<i class=\"coin-edge\"></i>".repeat(9)}<i class="coin-face coin-front"></i><i class="coin-face coin-back"></i></div></div>`,
+    `<div class="coin-payout" id="coinPayout"></div><div class="coin-result" id="coinResult"></div><div class="coin-won" id="coinWon"></div><div class="coin-stage"><div class="coin3d" id="coin">${"<i class=\"coin-edge\"></i>".repeat(9)}<i class="coin-face coin-front"></i><i class="coin-face coin-back"></i></div></div>`,
     `<label class="bet-label" data-i18n="game.coinflip.pick">Pick a side</label>
      <div class="bet-row">
        <button class="chip side active" data-side="heads" data-i18n="game.coinflip.heads">Heads</button>
@@ -764,6 +795,11 @@ function renderCoinflip(){
       const d = await call("/games-bet-coinflip", { bet_amount: bet, choice, client_seed: getOrCreateClientSeed() });
       await flipCoin(d.result);
       showCoinResult(d.won);
+      if (d.won) {
+        const won = Math.max(0, d.balance - state.balance + bet);
+        showCoinWon(won);
+        await flyWinToBalance(won);
+      }
       setBalance(d.balance);
     } catch (e) { fail(e); }
     coinBusy = false; $("actionBtn").disabled = false; $("demoBtn").disabled = false;
