@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Donut Clash — Reportes</title>
+<style>
+  :root{--bg:#0a0e14;--panel:#10151d;--alt:#141b26;--border:#232b38;--text:#e8eaed;--muted:#8a94a6;--accent:#3b82f6;--ok:#22c55e}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',Roboto,Arial,sans-serif;padding:24px;max-width:1000px;margin:0 auto}
+  h1{font-size:1.3rem} .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  input,select,button{padding:9px 12px;background:#000;border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit}
+  button{background:var(--accent);border:none;font-weight:700;cursor:pointer} button.ghost{background:var(--alt);border:1px solid var(--border)}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px}
+  .card.resolved{opacity:.55} .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:.8rem;color:var(--muted);margin-bottom:8px}
+  .tag{background:var(--alt);border:1px solid var(--border);border-radius:6px;padding:1px 7px;color:var(--text);font-weight:700}
+  .text{white-space:pre-wrap;word-break:break-word} .err{color:#ef4444}
+</style>
+</head>
+<body>
+<h1>Reportes de bugs</h1>
+<div class="row">
+  <input id="pw" type="password" placeholder="Palabra clave de admin" autocomplete="off">
+  <button id="load">Cargar</button>
+  <select id="fType"><option value="">Todos los tipos</option><option>crash</option><option>mines</option><option>coinflip</option><option>deposit</option><option>chat</option><option>other</option></select>
+  <select id="fStatus"><option value="open">Abiertos</option><option value="resolved">Resueltos</option><option value="">Todos</option></select>
+</div>
+<div id="msg" class="err"></div>
+<div id="list"></div>
+<script>
+const API = "https://donut-clash-rho.vercel.app/api";
+let reports = [];
+const $ = (id) => document.getElementById(id);
+async function post(path, body){
+  const r = await fetch(API + path, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ admin_password: $("pw").value, ...body }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "Error");
+  return d;
+}
+function render(){
+  const t = $("fType").value, s = $("fStatus").value;
+  const list = $("list"); list.innerHTML = "";
+  const rows = reports.filter((r) => (!t || r.type === t) && (!s || (r.status || "open") === s));
+  if (!rows.length) { list.textContent = "Sin reportes."; return; }
+  rows.forEach((r) => {
+    const st = r.status || "open";
+    const card = document.createElement("div"); card.className = "card" + (st === "resolved" ? " resolved" : "");
+    const meta = document.createElement("div"); meta.className = "meta";
+    const mk = (txt, cls) => { const e = document.createElement("span"); if (cls) e.className = cls; e.textContent = txt; return e; };
+    meta.append(mk(r.type, "tag"), mk(r.minecraft_username + " (nv. " + r.level + ")"), mk(new Date(r.created_at).toLocaleString()), mk("pestaña: " + (r.page || "-")));
+    const text = document.createElement("div"); text.className = "text"; text.textContent = r.text;
+    const ua = document.createElement("div"); ua.className = "meta"; ua.style.marginTop = "8px"; ua.textContent = r.user_agent || "";
+    const btn = document.createElement("button"); btn.className = "ghost"; btn.style.marginTop = "8px";
+    btn.textContent = st === "resolved" ? "Reabrir" : "Marcar resuelto";
+    btn.onclick = async () => { try { await post("/admin-bug-resolve", { id: r._id, status: st === "resolved" ? "open" : "resolved" }); r.status = st === "resolved" ? "open" : "resolved"; render(); } catch (e) { $("msg").textContent = e.message; } };
+    card.append(meta, text, ua, btn); list.appendChild(card);
+  });
+}
+async function load(){
+  $("msg").textContent = "";
+  try { reports = (await post("/admin-bug-reports", {})).reports; render(); } catch (e) { $("msg").textContent = e.message; }
+}
+$("load").onclick = load; $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") load(); });
+$("fType").onchange = render; $("fStatus").onchange = render;
+</script>
+</body>
+</html>

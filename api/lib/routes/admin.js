@@ -1,4 +1,5 @@
 const express = require("express");
+const { ObjectId } = require("mongodb");
 const { getBetsCollection, connectToDatabase } = require("../db");
 const { getHouseReserve, getBotRealBalance } = require("../house");
 const { getCirculatingDonuts } = require("../bankroll");
@@ -96,6 +97,23 @@ router.post("/admin-bug-reports", requireAdminPanelAuth, async (req, res) => {
     return res.status(200).json({ reports });
   } catch (err) {
     console.error("Error en /admin-bug-reports:", err);
+    return res.status(500).json({ error: "Error interno del servidor." });
+  }
+});
+
+/**
+ * POST /api/admin-bug-resolve
+ * Body: { admin_password, id, status: "open" | "resolved" }
+ */
+router.post("/admin-bug-resolve", requireAdminPanelAuth, async (req, res) => {
+  try {
+    const { id, status } = req.body || {};
+    if (!ObjectId.isValid(id) || !["open", "resolved"].includes(status)) return res.status(400).json({ error: "Datos inválidos." });
+    const db = await connectToDatabase();
+    await db.collection("bug_reports").updateOne({ _id: new ObjectId(id) }, { $set: { status } });
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error("Error en /admin-bug-resolve:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
