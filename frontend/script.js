@@ -1611,6 +1611,7 @@ function renderAdminStats(stats){
         <td>${t2.wins}</td><td>${t2.losses}</td><td>${t2.forced_losses}</td>
       </tr></tfoot>
     </table>
+    <p style="margin-top:20px"><a class="btn-secondary" style="display:inline-block;text-decoration:none;padding:10px 16px;border-radius:8px" href="admin.html" target="_blank" rel="noopener">🐞 Bug reports</a></p>
   `;
   adminStatsView.classList.remove("hidden");
 }
