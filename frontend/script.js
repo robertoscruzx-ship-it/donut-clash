@@ -729,17 +729,18 @@ function flyWinToBalance(amount){
   el.textContent = `+${formatWonAmount(amount)}`;
   document.body.appendChild(el);
   const w = el.offsetWidth, h = el.offsetHeight;
-  // Misma X que el saldo del header, a la altura de "1.85x payout".
+  // Justo debajo del saldo del header, centrado con él.
   el.style.left = `${b.left + b.width / 2 - w / 2}px`;
-  el.style.top = `${a.top + a.height / 2 - h / 2}px`;
+  el.style.top = `${b.bottom + 6}px`;
+  flashBalance(2200);
   const anim = el.animate([{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 1, offset: 0.4 }, { opacity: 0 }],
     { duration: 2200, easing: "ease-out", fill: "forwards" });
   return anim.finished.catch(() => {}).then(() => el.remove());
 }
 // El saldo del header destella de blanco a verde un momento.
-function flashBalance() {
+function flashBalance(duration) {
   if (!balanceValue.animate) return;
-  balanceValue.animate([{ color: "#36d399" }, { color: "#36d399", offset: 0.35 }, { color: "" }], { duration: 1100, easing: "ease-out" });
+  balanceValue.animate([{ color: "" }, { color: "#36d399", offset: 0.12 }, { color: "#36d399", offset: 0.4 }, { color: "" }], { duration, easing: "ease-out" });
 }
 let coinIdleTimer = null;
 function coinIdle(startDeg = 0){
@@ -807,7 +808,6 @@ function renderCoinflip(){
         const won = Math.max(0, d.balance - state.balance + bet);
         await flyWinToBalance(won);
         setBalance(d.balance);
-        flashBalance();
       } else {
         setBalance(d.balance);
       }
