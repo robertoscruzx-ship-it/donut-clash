@@ -556,6 +556,7 @@ async function refreshBalance(){
   if (!state.username) return;
   try {
     const data = await apiFetch(`/user-${encodeURIComponent(state.username)}`);
+    if (state.winPending) return; // la animación de premio aún no suma el saldo
     state.balance = data.balance;
     if (typeof data.level === "number") {
       state.level = data.level;
@@ -737,6 +738,15 @@ function flyWinToBalance(amount){
     { duration: 2200, easing: "ease-out", fill: "forwards" });
   return anim.finished.catch(() => {}).then(() => el.remove());
 }
+// Punto único para CUALQUIER ganancia (de cualquier juego, presente o futuro):
+// muestra la animación del premio y recién cuando termina suma el saldo.
+// `payout` = total que te devuelve el juego; `newBalance` = saldo final del servidor.
+async function applyWin(payout, newBalance) {
+  if (!(payout > 0)) { setBalance(newBalance); return; }
+  state.winPending = true;
+  try { await flyWinToBalance(payout); }
+  finally { state.winPending = false; setBalance(newBalance); }
+}
 // El saldo del header destella de blanco a verde un momento.
 function flashBalance(duration) {
   if (!balanceValue.animate) return;
@@ -805,9 +815,7 @@ function renderCoinflip(){
       await flipCoin(d.result);
       showCoinResult(d.won);
       if (d.won) {
-        const won = Math.max(0, d.balance - state.balance + bet);
-        await flyWinToBalance(won);
-        setBalance(d.balance);
+        await applyWin(d.payout, d.balance);
       } else {
         setBalance(d.balance);
       }
@@ -911,8 +919,8 @@ async function minesCashout(){
   try {
     const d = await call("/games-mines-cashout", { game_id: state.mines.id });
     say(wonText(d.multiplier, d.payout));
-    setBalance(d.balance);
     endMines(d.bomb_positions);
+    await applyWin(d.payout, d.balance);
   } catch (e) { fail(e); }
 }
 
@@ -1244,8 +1252,8 @@ async function crashCashout(){
     const d = await call("/games-crash-cashout", {});
     c.cashedOut = true;
     say(wonText(d.multiplier, d.payout));
-    setBalance(d.balance);
     setAction("game.crash.cashedOut");
+    await applyWin(d.payout, d.balance);
   } catch (e) {
     fail(e);
     $("actionBtn").disabled = false;
