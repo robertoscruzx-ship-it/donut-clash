@@ -1071,6 +1071,40 @@ function crashRenderAxes(viewT, viewM, targetT, targetM){
   if (labEl) labEl.innerHTML = labels;
 }
 
+// Explosión al chocar: destello, onda expansiva, chispas y un pequeño temblor del gráfico.
+function crashExplode(x, y){
+  const wrap = $("crashWrap");
+  if (!wrap || !wrap.animate) return;
+  const mk = (cls, css) => {
+    const el = document.createElement("div");
+    el.className = cls;
+    el.style.cssText = `left:${x}px;top:${y}px;${css || ""}`;
+    wrap.appendChild(el);
+    return el;
+  };
+  const done = (el, anim) => anim.finished.catch(() => {}).then(() => el.remove());
+  const flash = mk("boom-flash");
+  done(flash, flash.animate([{ transform: "translate(-50%,-50%) scale(.2)", opacity: 1 }, { transform: "translate(-50%,-50%) scale(2.6)", opacity: 0 }], { duration: 420, easing: "ease-out" }));
+  const ring = mk("boom-ring");
+  done(ring, ring.animate([{ transform: "translate(-50%,-50%) scale(.2)", opacity: 1 }, { transform: "translate(-50%,-50%) scale(4)", opacity: 0 }], { duration: 650, easing: "cubic-bezier(.1,.7,.3,1)" }));
+  const colors = ["#fff7c2", "#ffd23f", "#ff9d1a", "#ff6a13", "#ef4444"];
+  for (let i = 0; i < 34; i++) {
+    const size = 3 + Math.random() * 6;
+    const col = colors[Math.floor(Math.random() * colors.length)];
+    const sp = mk("boom-spark", `width:${size}px;height:${size}px;background:${col};box-shadow:0 0 ${size * 2}px ${col};`);
+    const ang = Math.random() * Math.PI * 2, dist = 45 + Math.random() * 110;
+    const dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist + 25 + Math.random() * 35; // cae un poco (gravedad)
+    done(sp, sp.animate([
+      { transform: "translate(-50%,-50%) scale(1)", opacity: 1 },
+      { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.2)`, opacity: 0 },
+    ], { duration: 550 + Math.random() * 600, easing: "cubic-bezier(.15,.7,.3,1)" }));
+  }
+  wrap.animate([
+    { transform: "translate(0,0)" }, { transform: "translate(-5px,3px)" }, { transform: "translate(4px,-4px)" },
+    { transform: "translate(-3px,-2px)" }, { transform: "translate(2px,2px)" }, { transform: "translate(0,0)" },
+  ], { duration: 360, easing: "ease-out" });
+}
+
 function crashRenderGraph(status, round){
   const svg = $("crashSvg");
   const line = $("crashLine"), area = $("crashArea"), rocket = $("crashRocket");
@@ -1136,6 +1170,14 @@ function crashRenderGraph(status, round){
   } else {
     if (c.fx) c.fx.hide();
     rocket.style.opacity = "1";
+    if (status === "crashed" && c.explodedRound !== round.round_number) {
+      c.explodedRound = round.round_number;
+      // Solo se anima si el choque es reciente (no al entrar a ver una ronda que ya explotó).
+      if (!round.crash_at || Date.now() - round.crash_at < 4000) {
+        crashExplode(last.x * sx, last.y * sy);
+        if (rocket.animate) rocket.animate([{ transform: `translate(-50%,-50%) scale(.3)`, opacity: 0 }, { transform: `translate(-50%,-50%) scale(1.5)`, opacity: 1, offset: 0.35 }, { transform: `translate(-50%,-50%) scale(1)`, opacity: 1 }], { duration: 500, easing: "ease-out" });
+      }
+    }
   }
 }
 
