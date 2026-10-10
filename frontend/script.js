@@ -837,14 +837,13 @@ function renderCoinflip(){
 // ---------- MINES ----------
 function renderMines(){
   layout(
-    `<div class="stage-title">💣 <span data-i18n="game.mines.name">Mines</span></div><div class="mines-grid" id="minesGrid"></div>`,
+    `<div class="stage-title"><span data-i18n="game.mines.name">Mines</span></div><div class="mines-grid" id="minesGrid"></div>`,
     `<label class="bet-label" data-i18n="game.mines.bombs">Bombs</label>
      <input type="number" id="bombs" min="1" max="24" value="3">`, "bet.placeBet", true);
   const grid = $("minesGrid");
   for (let i = 0; i < 25; i++){
     const tile = document.createElement("div");
     tile.className = "mine-tile";
-    tile.textContent = "?";
     tile.onclick = () => revealTile(i, tile);
     grid.appendChild(tile);
   }
@@ -864,7 +863,7 @@ function minesDemoStart(){
   const rnd = new Uint32Array(25); crypto.getRandomValues(rnd);
   for (let i = 24; i > 0; i--) { const j = rnd[i] % (i + 1); [idx[i], idx[j]] = [idx[j], idx[i]]; }
   state.mines = { demo: true, bombsCount: bombs, bombs: new Set(idx.slice(0, bombs)), revealed: 0 };
-  gameView.querySelectorAll(".mine-tile").forEach((x) => { x.className = "mine-tile"; x.textContent = "?"; });
+  gameView.querySelectorAll(".mine-tile").forEach((x) => { x.className = "mine-tile"; x.textContent = ""; });
   lockPanel(true);
   setAction("bet.cashOut");
   say(t("bet.demoTag"));
@@ -876,12 +875,54 @@ async function minesStart(){
   try {
     const d = await call("/games-mines-start", { bet_amount: bet, bombs_count: Number($("bombs").value) || 0, client_seed: getOrCreateClientSeed() });
     state.mines = { id: d.game_id };
-    gameView.querySelectorAll(".mine-tile").forEach((x) => { x.className = "mine-tile"; x.textContent = "?"; });
+    gameView.querySelectorAll(".mine-tile").forEach((x) => { x.className = "mine-tile"; x.textContent = ""; });
     lockPanel(true);
     setAction("bet.cashOut");
     say("");
     refreshBalance();
   } catch (e) { fail(e); }
+}
+
+// Muestra el contenido de una casilla: esmeralda (segura) o bomba. Si `boom`, la bomba explota.
+function minesShow(tile, kind, boom){
+  tile.classList.add(kind === "bomb" ? "revealed-bomb" : "revealed-safe");
+  tile.innerHTML = `<img class="mine-img" src="assets/${kind === "bomb" ? "bomb" : "emerald"}.png" alt="" draggable="false">`;
+  const img = tile.firstChild;
+  if (img.animate && !boom) img.animate([{ transform: "scale(.3)", opacity: 0 }, { transform: "scale(1.15)", opacity: 1, offset: .6 }, { transform: "scale(1)", opacity: 1 }], { duration: 280, easing: "ease-out" });
+  if (boom) minesExplode(tile);
+}
+
+// Explosión de Mines (distinta a la de Crash): la bomba se infla, destello blanco, fragmentos
+// cuadrados tipo pixel-art que salen en todas direcciones, humo gris y la casilla tiembla.
+function minesExplode(tile){
+  const img = tile.querySelector(".mine-img");
+  if (!tile.animate) return;
+  if (img) img.animate([{ transform: "scale(1)", filter: "brightness(1)" }, { transform: "scale(1.45)", filter: "brightness(3)", offset: .35 }, { transform: "scale(1.1)", filter: "brightness(1)" }], { duration: 420, easing: "ease-out" });
+  tile.animate([{ transform: "translate(0,0)" }, { transform: "translate(-4px,2px)" }, { transform: "translate(4px,-3px)" }, { transform: "translate(-3px,-2px)" }, { transform: "translate(2px,3px)" }, { transform: "translate(0,0)" }], { duration: 380 });
+  const mk = (css) => { const el = document.createElement("div"); el.className = "mine-fx"; el.style.cssText = css; tile.appendChild(el); return el; };
+  const rm = (el, a) => a.finished.catch(() => {}).then(() => el.remove());
+  const flash = mk("inset:0;background:#fff;border-radius:6px;");
+  rm(flash, flash.animate([{ opacity: .9 }, { opacity: 0 }], { duration: 300, easing: "ease-out" }));
+  const cols = ["#ffffff", "#ffd23f", "#ff8a1f", "#e63b2e", "#3a3a3a"];
+  const N = 16;
+  for (let i = 0; i < N; i++) {
+    const size = 4 + Math.floor(Math.random() * 3) * 2;
+    const col = cols[Math.floor(Math.random() * cols.length)];
+    const el = mk(`left:50%;top:50%;width:${size}px;height:${size}px;background:${col};`);
+    const ang = (i / N) * Math.PI * 2 + Math.random() * .4, dist = 38 + Math.random() * 40;
+    rm(el, el.animate([
+      { transform: "translate(-50%,-50%) rotate(0deg)", opacity: 1 },
+      { transform: `translate(calc(-50% + ${Math.cos(ang) * dist}px), calc(-50% + ${Math.sin(ang) * dist}px)) rotate(${Math.random() * 360}deg)`, opacity: 0 },
+    ], { duration: 450 + Math.random() * 300, easing: "cubic-bezier(.1,.7,.3,1)" }));
+  }
+  for (let i = 0; i < 4; i++) {
+    const sz = 18 + Math.random() * 12;
+    const el = mk(`left:${35 + Math.random() * 30}%;top:${35 + Math.random() * 30}%;width:${sz}px;height:${sz}px;border-radius:50%;background:rgba(150,150,150,.55);`);
+    rm(el, el.animate([
+      { transform: "translate(-50%,-50%) scale(.4)", opacity: .8 },
+      { transform: `translate(calc(-50% + ${(Math.random() - .5) * 30}px), calc(-50% - ${28 + Math.random() * 22}px)) scale(1.8)`, opacity: 0 },
+    ], { duration: 800 + Math.random() * 300, easing: "ease-out", delay: 120 }));
+  }
 }
 
 async function revealTile(i, tile){
@@ -890,12 +931,12 @@ async function revealTile(i, tile){
     if (tile.classList.contains("revealed-safe")) return;
     const m = state.mines;
     if (m.bombs.has(i)) {
-      tile.classList.add("revealed-bomb"); tile.textContent = "💣";
+      minesShow(tile, "bomb", true);
       say(`${t("bet.demoTag")} ${t("game.mines.boom")}`);
       endMines([...m.bombs]);
     } else {
       m.revealed += 1;
-      tile.classList.add("revealed-safe"); tile.textContent = "💎";
+      minesShow(tile, "safe");
       say(`${t("bet.demoTag")} ${t("game.mines.multiplierPrefix")}${minesFairMultiplier(m.revealed, m.bombsCount).toFixed(2)}x`);
     }
     return;
@@ -905,13 +946,11 @@ async function revealTile(i, tile){
   try {
     const d = await call("/games-mines-reveal", { game_id: state.mines.id, tile_index: i });
     if (d.result === "bomb"){
-      tile.classList.add("revealed-bomb");
-      tile.textContent = "💣";
+      minesShow(tile, "bomb", true);
       say(t("game.mines.boom"));
       endMines(d.bomb_positions);
     } else {
-      tile.classList.add("revealed-safe");
-      tile.textContent = "💎";
+      minesShow(tile, "safe");
       say(`${t("game.mines.multiplierPrefix")}${d.current_multiplier.toFixed(2)}x` + (d.board_fully_cleared ? t("game.mines.boardCleared") : ""));
     }
   } catch (e) { fail(e); }
@@ -940,7 +979,7 @@ function endMines(bombs){
   setAction("bet.placeBet");
   const tiles = gameView.querySelectorAll(".mine-tile");
   (bombs || []).forEach((i) => {
-    if (!tiles[i].classList.contains("revealed-bomb")) { tiles[i].classList.add("revealed-bomb"); tiles[i].textContent = "💣"; }
+    if (!tiles[i].classList.contains("revealed-bomb")) minesShow(tiles[i], "bomb");
   });
 }
 

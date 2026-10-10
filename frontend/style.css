@@ -314,6 +314,7 @@ body{
   cursor:pointer;
   font-size:1.2rem;
   display:flex; align-items:center; justify-content:center;
+  position:relative; overflow:visible;
 }
 .mine-tile:hover{border-color:var(--accent);}
 .mine-tile.revealed-safe{background:#062a19; border-color:var(--success); color:var(--success);}
@@ -603,3 +604,7 @@ body{
 .cw-text{font-size:2.2rem; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--accent);}
 .cw-timer{font-size:1.8rem; font-weight:700; line-height:1; color:var(--muted); font-variant-numeric:tabular-nums;}
 @media (max-width:600px){ .cw-timer{font-size:1.4rem;} .cw-text{font-size:1.5rem;} }
+
+.mine-img{width:78%; height:78%; object-fit:contain; image-rendering:pixelated; pointer-events:none; user-select:none;}
+.mine-fx{position:absolute; pointer-events:none; z-index:5;}
+.mine-tile.revealed-bomb{z-index:2;}
