@@ -13,7 +13,8 @@ function fairMultiplier(revealedCount, bombsCount, total = BOARD_SIZE) {
 }
 
 function payoutMultiplier(revealedCount, bombsCount, houseEdge, total = BOARD_SIZE) {
-  return fairMultiplier(revealedCount, bombsCount, total) * (1 - houseEdge);
+  // Nunca por debajo de 1x: tras acertar una casilla nunca se paga menos de lo apostado.
+  return Math.max(1, fairMultiplier(revealedCount, bombsCount, total) * (1 - houseEdge));
 }
 
 module.exports = { BOARD_SIZE, fairMultiplier, payoutMultiplier };

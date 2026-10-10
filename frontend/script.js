@@ -574,7 +574,8 @@ async function refreshBalance(){
 // ==============================
 const $ = (id) => document.getElementById(id);
 const getBet = () => Math.floor(Number($("betAmount").value)) || 0;
-const say = (txt) => { $("gameMessage").textContent = txt; };
+// El texto de estado bajo el panel se eliminó; say() queda como no-op por compatibilidad.
+const say = () => {};
 const wonText = (m, p) => `${t("game.crash.wonPrefix")}${m.toFixed(2)}${t("game.crash.wonMiddle")}${p} ${t("donuts")}.`;
 
 function startBalanceLoop(){
@@ -671,7 +672,6 @@ function layout(stageHTML, extraHTML, actionKey, withDemo = false){
         ${extraHTML}
         <button id="actionBtn" class="btn-primary btn-lg" data-i18n="${actionKey}"></button>
         ${withDemo ? `<button id="demoBtn" class="btn-demo btn-lg" data-i18n="bet.demo">Demo</button>` : ""}
-        <p id="gameMessage" class="muted small"></p>
       </aside>
     </div>`;
   $("betHalf").onclick = () => { $("betAmount").value = Math.max(1, Math.floor(getBet() / 2)); };
