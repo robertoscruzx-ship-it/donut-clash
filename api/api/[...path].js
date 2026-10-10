@@ -5,6 +5,7 @@ const accountRoutes = require("../lib/routes/account");
 const adminRoutes = require("../lib/routes/admin");
 const gamesRoutes = require("../lib/routes/games");
 const userRoutes = require("../lib/routes/user");
+const chatRoutes = require("../lib/routes/chat");
 
 const app = express();
 
@@ -25,5 +26,6 @@ app.use("/api", accountRoutes);
 app.use("/api", adminRoutes);
 app.use("/api", gamesRoutes);
 app.use("/api", userRoutes);
+app.use("/api", chatRoutes);
 
 module.exports = app;

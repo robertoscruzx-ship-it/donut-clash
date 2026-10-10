@@ -212,6 +212,21 @@
 
         <div id="adminStatsView" class="hidden"></div>
       </main>
+
+      <!-- CHAT PÚBLICO -->
+      <aside id="chatPanel" class="chat-panel">
+        <div class="chat-head">
+          <span class="chat-title" data-i18n="chat.title">Chat</span>
+          <button id="chatHide" class="chat-toggle" aria-label="Hide chat" title="Hide">&#9654;</button>
+        </div>
+        <div id="chatList" class="chat-list"></div>
+        <form id="chatForm" class="chat-form">
+          <input id="chatInput" type="text" maxlength="200" autocomplete="off" data-i18n-placeholder="chat.placeholder" placeholder="Say something...">
+          <button type="submit" id="chatSend" class="chat-send" data-i18n="chat.send">Send</button>
+        </form>
+        <div id="chatNotice" class="chat-notice hidden"></div>
+      </aside>
+      <button id="chatShow" class="chat-open hidden" aria-label="Show chat" title="Chat">&#9664;</button>
     </div>
   </div>
 

@@ -143,7 +143,7 @@ const toastContainer = document.getElementById("toastContainer");
 // ==============================
 // IDIOMA
 // ==============================
-langSelect.addEventListener("change", () => setLanguage(langSelect.value));
+langSelect.addEventListener("change", () => { setLanguage(langSelect.value); if (window.chatRefreshAccess) window.chatRefreshAccess(); });
 applyTranslations(); // aplica "en" por defecto al cargar
 
 // ==============================
@@ -197,6 +197,7 @@ function updateXpDisplay(){
 // Cambia Sign In / Register por la cabeza de Minecraft del jugador
 // en cuanto hay una sesión vinculada, y muestra/oculta la carterita.
 function updateAuthUI(){
+  if (window.chatRefreshAccess) setTimeout(window.chatRefreshAccess, 0);
   const linked = !!(state.sessionToken && state.username);
   signInBtn.classList.toggle("hidden", linked);
   registerBtn.classList.toggle("hidden", linked);
@@ -559,6 +560,7 @@ async function refreshBalance(){
     state.balance = data.balance;
     if (typeof data.level === "number") {
       state.level = data.level;
+      if (window.chatRefreshAccess) window.chatRefreshAccess();
       state.xpIntoLevel = data.xp_into_level;
       state.xpForNextLevel = data.xp_for_next_level;
     }
@@ -1612,3 +1614,81 @@ function renderAdminStats(stats){
   `;
   adminStatsView.classList.remove("hidden");
 }
+
+// ==============================
+// CHAT PÚBLICO (lectura abierta; solo nivel 15+ puede escribir)
+// ==============================
+const CHAT_MIN_LEVEL = 15;
+const chatState = { last: null, timer: null, open: true, seen: new Set() };
+(function initChat(){
+  const panel = $("chatPanel");
+  if (!panel) return;
+  const list = $("chatList"), form = $("chatForm"), input = $("chatInput"), notice = $("chatNotice");
+  try { chatState.open = localStorage.getItem("chatOpen") !== "0"; } catch (e) {}
+
+  function setOpen(v){
+    chatState.open = v;
+    try { localStorage.setItem("chatOpen", v ? "1" : "0"); } catch (e) {}
+    panel.classList.toggle("collapsed", !v);
+    $("chatShow").classList.toggle("hidden", v);
+    if (v) { chatPoll(true); startTimer(); } else stopTimer();
+  }
+  function startTimer(){ stopTimer(); chatState.timer = setInterval(() => { if (!document.hidden) chatPoll(); }, 3000); }
+  function stopTimer(){ if (chatState.timer) { clearInterval(chatState.timer); chatState.timer = null; } }
+
+  function addMsg(m){
+    if (chatState.seen.has(m.id)) return;
+    chatState.seen.add(m.id);
+    chatState.last = m.id;
+    const row = document.createElement("div");
+    row.className = "chat-msg";
+    const img = document.createElement("img");
+    img.src = `https://mc-heads.net/avatar/${encodeURIComponent(m.minecraft_username)}/48`;
+    img.alt = "";
+    const body = document.createElement("div");
+    body.className = "chat-body";
+    const lvl = document.createElement("span"); lvl.className = "chat-lvl"; lvl.textContent = m.level;
+    const name = document.createElement("span"); name.className = "chat-name"; name.textContent = m.minecraft_username;
+    const text = document.createElement("div"); text.className = "chat-text"; text.textContent = m.text;
+    const head = document.createElement("div"); head.append(lvl, name);
+    body.append(head, text);
+    row.append(img, body);
+    list.appendChild(row);
+  }
+  async function chatPoll(initial){
+    try {
+      const d = await apiFetch(`/chat-messages${chatState.last && !initial ? `?after=${chatState.last}` : ""}`);
+      const stick = list.scrollHeight - list.scrollTop - list.clientHeight < 60 || !list.children.length;
+      if (initial) { list.innerHTML = ""; chatState.seen.clear(); chatState.last = null; }
+      const empty = list.querySelector(".chat-empty"); if (empty) empty.remove();
+      d.messages.forEach(addMsg);
+      if (!list.children.length) list.innerHTML = `<div class="chat-empty">${t("chat.empty")}</div>`;
+      if (stick) list.scrollTop = list.scrollHeight;
+    } catch (e) { /* se reintenta en el próximo sondeo */ }
+  }
+  // Muestra la caja de escritura solo si hay sesión y nivel suficiente.
+  window.chatRefreshAccess = function(){
+    const linked = !!(state.sessionToken && state.username);
+    const can = linked && state.level >= CHAT_MIN_LEVEL;
+    form.classList.toggle("hidden", !can);
+    notice.classList.toggle("hidden", can);
+    notice.textContent = !linked ? t("chat.needLogin") : t("chat.needLevel").replace("{n}", CHAT_MIN_LEVEL);
+  };
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    try {
+      const d = await call("/chat-send", { text });
+      addMsg(d.message);
+      list.scrollTop = list.scrollHeight;
+    } catch (e) { input.value = text; fail(e); }
+  });
+  $("chatHide").onclick = () => setOpen(false);
+  $("chatShow").onclick = () => setOpen(true);
+  // En pantallas angostas arranca oculto para no tapar el juego.
+  if (window.matchMedia("(max-width:900px)").matches && !localStorage.getItem("chatOpen")) chatState.open = false;
+  setOpen(chatState.open);
+  chatRefreshAccess();
+})();
