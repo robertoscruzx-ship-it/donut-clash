@@ -1,5 +1,5 @@
 const express = require("express");
-const { getBetsCollection } = require("../db");
+const { getBetsCollection, connectToDatabase } = require("../db");
 const { getHouseReserve, getBotRealBalance } = require("../house");
 const { getCirculatingDonuts } = require("../bankroll");
 const { MAX_EXPOSURE_FRACTION } = require("../houseEdge");
@@ -81,6 +81,21 @@ router.post("/admin-stats", requireAdminPanelAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("Error en /admin/stats:", err);
+    return res.status(500).json({ error: "Error interno del servidor." });
+  }
+});
+
+/**
+ * POST /api/admin-bug-reports
+ * Body: { admin_password } — lista los últimos 200 reportes de bugs (más recientes primero).
+ */
+router.post("/admin-bug-reports", requireAdminPanelAuth, async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const reports = await db.collection("bug_reports").find({}).sort({ created_at: -1 }).limit(200).toArray();
+    return res.status(200).json({ reports });
+  } catch (err) {
+    console.error("Error en /admin-bug-reports:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });

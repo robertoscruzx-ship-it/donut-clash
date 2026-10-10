@@ -104,4 +104,41 @@ router.post("/presence-ping", async (req, res) => {
   }
 });
 
+/**
+ * POST /api/bug-report
+ * Body: { minecraft_username, session_token, type, text, page?, user_agent? }
+ * Guarda el reporte en la colección bug_reports (máx. 5 por hora por jugador).
+ */
+const BUG_TYPES = ["crash", "mines", "coinflip", "deposit", "chat", "other"];
+router.post("/bug-report", async (req, res) => {
+  try {
+    const { minecraft_username, session_token, type, page, user_agent } = req.body || {};
+    const text = String((req.body && req.body.text) || "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim();
+    if (text.length < 5 || text.length > 1000) return res.status(400).json({ error: "El reporte debe tener entre 5 y 1000 caracteres." });
+    if (!BUG_TYPES.includes(type)) return res.status(400).json({ error: "Tipo inválido." });
+    const user = await getUserBySession(minecraft_username, session_token);
+    if (!user) return res.status(401).json({ error: "Sesión inválida." });
+
+    const db = await connectToDatabase();
+    const col = db.collection("bug_reports");
+    const recent = await col.countDocuments({ minecraft_username, created_at: { $gt: new Date(Date.now() - 3600 * 1000) } });
+    if (recent >= 5) return res.status(429).json({ error: "Has enviado muchos reportes; inténtalo más tarde." });
+
+    await col.insertOne({
+      minecraft_username,
+      level: levelInfo(user.xp || 0).level,
+      type,
+      text,
+      page: String(page || "").slice(0, 30),
+      user_agent: String(user_agent || "").slice(0, 200),
+      status: "open",
+      created_at: new Date(),
+    });
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error("Error en /bug-report:", err);
+    return res.status(500).json({ error: "Error interno del servidor." });
+  }
+});
+
 module.exports = router;

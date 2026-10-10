@@ -1624,15 +1624,7 @@ const chatState = { last: null, timer: null, open: true, seen: new Set() };
   const panel = $("chatPanel");
   if (!panel) return;
   const list = $("chatList"), form = $("chatForm"), input = $("chatInput"), notice = $("chatNotice");
-  try { chatState.open = localStorage.getItem("chatOpen") !== "0"; } catch (e) {}
 
-  function setOpen(v){
-    chatState.open = v;
-    try { localStorage.setItem("chatOpen", v ? "1" : "0"); } catch (e) {}
-    panel.classList.toggle("collapsed", !v);
-    $("chatShow").classList.toggle("hidden", v);
-    if (v) { chatPoll(true); startTimer(); } else stopTimer();
-  }
   function startTimer(){ stopTimer(); chatState.timer = setInterval(() => { if (!document.hidden) chatPoll(); }, 3000); }
   function stopTimer(){ if (chatState.timer) { clearInterval(chatState.timer); chatState.timer = null; } }
 
@@ -1686,10 +1678,24 @@ const chatState = { last: null, timer: null, open: true, seen: new Set() };
   const ping = () => { if (state.sessionToken && state.username && !document.hidden) call("/presence-ping", {}).catch(() => {}); };
   setInterval(ping, 30000);
   setTimeout(ping, 2500);
-  $("chatHide").onclick = () => setOpen(false);
-  $("chatShow").onclick = () => setOpen(true);
-  // En pantallas angostas arranca oculto para no tapar el juego.
-  if (window.matchMedia("(max-width:900px)").matches && !localStorage.getItem("chatOpen")) chatState.open = false;
-  setOpen(chatState.open);
-  chatRefreshAccess();
+  chatPoll(true); startTimer();
+
+  // ---- Reportar bugs ----
+  const bugModal = $("bugModal");
+  $("bugBtn").onclick = () => {
+    if (!(state.sessionToken && state.username)) { showToast(t("chat.needLogin"), { type: "error" }); return; }
+    bugModal.classList.remove("hidden");
+  };
+  $("bugClose").onclick = () => bugModal.classList.add("hidden");
+  bugModal.addEventListener("click", (e) => { if (e.target === bugModal) bugModal.classList.add("hidden"); });
+  $("bugSubmit").onclick = async () => {
+    const text = $("bugText").value.trim();
+    if (text.length < 5) { showToast(t("bug.tooShort"), { type: "error" }); return; }
+    try {
+      await call("/bug-report", { type: $("bugType").value, text, page: state.view, user_agent: navigator.userAgent.slice(0, 200) });
+      $("bugText").value = "";
+      bugModal.classList.add("hidden");
+      showToast(t("bug.thanks"), { type: "success" });
+    } catch (e) { fail(e); }
+  };
 })();
