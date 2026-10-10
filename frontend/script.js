@@ -556,7 +556,6 @@ async function refreshBalance(){
   if (!state.username) return;
   try {
     const data = await apiFetch(`/user-${encodeURIComponent(state.username)}`);
-    if (state.winPending) return; // la animación de premio aún no suma el saldo
     state.balance = data.balance;
     if (typeof data.level === "number") {
       state.level = data.level;
@@ -719,38 +718,49 @@ function formatWonAmount(n) {
   const v = Number(n) || 0;
   return Math.abs(v) < 1000 ? v.toFixed(2) : formatCompactBalance(v);
 }
-// Muestra "+cantidad" junto al pago y se desvanece despacio, como el "You win".
-// Resuelve cuando desaparece (ahí se suma el saldo).
-function flyWinToBalance(amount){
-  const from = $("coinPayout"), to = balanceValue;
-  if (!from || !to || !document.body.animate) return Promise.resolve();
-  const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+// Cola de animaciones de premio: se muestran una tras otra; si hay otra esperando
+// (o llega mientras corre), la actual va al doble de velocidad. La última, normal.
+const winQueue = [];
+let winRunning = null; // { anims: [Animation, ...] }
+function setWinSpeed(run, rate) { run.anims.forEach((an) => { try { an.updatePlaybackRate(rate); } catch (e) {} }); }
+async function runWinQueue() {
+  if (winRunning) return;
+  while (winQueue.length) {
+    const amount = winQueue.shift();
+    await playWinBox(amount, winQueue.length > 0 ? 2 : 1);
+  }
+}
+function playWinBox(amount, rate) {
+  const from = $("coinPayout") || null, to = balanceValue;
+  if (!to || !document.body.animate) return Promise.resolve();
+  const b = to.getBoundingClientRect();
   const el = document.createElement("div");
   el.className = "win-fly";
   el.textContent = `+${formatWonAmount(amount)}`;
   document.body.appendChild(el);
-  const w = el.offsetWidth, h = el.offsetHeight;
+  const w = el.offsetWidth;
   // Justo debajo del saldo del header, centrado con él.
   el.style.left = `${b.left + b.width / 2 - w / 2}px`;
   el.style.top = `${b.bottom + 6}px`;
-  flashBalance(2200);
-  const anim = el.animate([{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 1, offset: 0.4 }, { opacity: 0 }],
+  const boxAnim = el.animate([{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 1, offset: 0.4 }, { opacity: 0 }],
     { duration: 2200, easing: "ease-out", fill: "forwards" });
-  return anim.finished.catch(() => {}).then(() => el.remove());
+  if (winFlash) winFlash.cancel();
+  winFlash = to.animate([{ color: "" }, { color: "#36d399", offset: 0.12 }, { color: "#36d399", offset: 0.4 }, { color: "" }],
+    { duration: 2200, easing: "ease-out" });
+  winRunning = { anims: [boxAnim, winFlash] };
+  setWinSpeed(winRunning, rate);
+  return boxAnim.finished.catch(() => {}).then(() => { el.remove(); winRunning = null; });
 }
+let winFlash = null;
 // Punto único para CUALQUIER ganancia (de cualquier juego, presente o futuro):
-// muestra la animación del premio y recién cuando termina suma el saldo.
+// el saldo se actualiza al instante y se encola la animación del premio.
 // `payout` = total que te devuelve el juego; `newBalance` = saldo final del servidor.
-async function applyWin(payout, newBalance) {
-  if (!(payout > 0)) { setBalance(newBalance); return; }
-  state.winPending = true;
-  try { await flyWinToBalance(payout); }
-  finally { state.winPending = false; setBalance(newBalance); }
-}
-// El saldo del header destella de blanco a verde un momento.
-function flashBalance(duration) {
-  if (!balanceValue.animate) return;
-  balanceValue.animate([{ color: "" }, { color: "#36d399", offset: 0.12 }, { color: "#36d399", offset: 0.4 }, { color: "" }], { duration, easing: "ease-out" });
+function applyWin(payout, newBalance) {
+  setBalance(newBalance);
+  if (!(payout > 0)) return;
+  winQueue.push(payout);
+  if (winRunning) setWinSpeed(winRunning, 2); // ya hay otra detrás: la actual acelera
+  runWinQueue();
 }
 let coinIdleTimer = null;
 function coinIdle(startDeg = 0){
