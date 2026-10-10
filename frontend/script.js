@@ -1647,12 +1647,11 @@ const chatState = { last: null, timer: null, open: true, seen: new Set() };
     img.alt = "";
     const body = document.createElement("div");
     body.className = "chat-body";
-    const lvl = document.createElement("span"); lvl.className = "chat-lvl"; lvl.textContent = m.level;
-    const name = document.createElement("span"); name.className = "chat-name"; name.textContent = m.minecraft_username;
+    const lvl = document.createElement("div"); lvl.className = "chat-lvlbox" + (m.level >= CHAT_MIN_LEVEL ? " hi" : ""); lvl.textContent = m.level;
+    const name = document.createElement("div"); name.className = "chat-name"; name.textContent = m.minecraft_username;
     const text = document.createElement("div"); text.className = "chat-text"; text.textContent = m.text;
-    const head = document.createElement("div"); head.append(lvl, name);
-    body.append(head, text);
-    row.append(img, body);
+    body.append(name, text);
+    row.append(lvl, img, body);
     list.appendChild(row);
   }
   async function chatPoll(initial){
@@ -1662,22 +1661,18 @@ const chatState = { last: null, timer: null, open: true, seen: new Set() };
       if (initial) { list.innerHTML = ""; chatState.seen.clear(); chatState.last = null; }
       const empty = list.querySelector(".chat-empty"); if (empty) empty.remove();
       d.messages.forEach(addMsg);
+      if (typeof d.online === "number") $("chatOnline").textContent = d.online;
       if (!list.children.length) list.innerHTML = `<div class="chat-empty">${t("chat.empty")}</div>`;
       if (stick) list.scrollTop = list.scrollHeight;
     } catch (e) { /* se reintenta en el próximo sondeo */ }
   }
-  // Muestra la caja de escritura solo si hay sesión y nivel suficiente.
-  window.chatRefreshAccess = function(){
-    const linked = !!(state.sessionToken && state.username);
-    const can = linked && state.level >= CHAT_MIN_LEVEL;
-    form.classList.toggle("hidden", !can);
-    notice.classList.toggle("hidden", can);
-    notice.textContent = !linked ? t("chat.needLogin") : t("chat.needLevel").replace("{n}", CHAT_MIN_LEVEL);
-  };
+  window.chatRefreshAccess = function(){};  // la caja siempre se ve; el nivel se valida al enviar
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const text = input.value.trim();
     if (!text) return;
+    if (!(state.sessionToken && state.username)) { showToast(t("chat.needLogin"), { type: "error" }); return; }
+    if (state.level < CHAT_MIN_LEVEL) { showToast(t("chat.needLevel").replace("{n}", CHAT_MIN_LEVEL), { type: "error" }); return; }
     input.value = "";
     try {
       const d = await call("/chat-send", { text });
@@ -1685,6 +1680,12 @@ const chatState = { last: null, timer: null, open: true, seen: new Set() };
       list.scrollTop = list.scrollHeight;
     } catch (e) { input.value = text; fail(e); }
   });
+  $("chatDiscord").onclick = () => showToast(t("banner.button"), { type: "info" });
+  $("chatRules").onclick = () => showToast(t("banner.button"), { type: "info" });
+  // Presencia: mientras haya sesión y la pestaña esté visible, avisa al servidor cada 30 s.
+  const ping = () => { if (state.sessionToken && state.username && !document.hidden) call("/presence-ping", {}).catch(() => {}); };
+  setInterval(ping, 30000);
+  setTimeout(ping, 2500);
   $("chatHide").onclick = () => setOpen(false);
   $("chatShow").onclick = () => setOpen(true);
   // En pantallas angostas arranca oculto para no tapar el juego.

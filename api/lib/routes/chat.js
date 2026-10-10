@@ -1,6 +1,6 @@
 const express = require("express");
 const { ObjectId } = require("mongodb");
-const { connectToDatabase } = require("../db");
+const { connectToDatabase, getUsersCollection } = require("../db");
 const { getUserBySession } = require("../session");
 const { levelInfo } = require("../xp");
 
@@ -10,6 +10,7 @@ const CHAT_MIN_LEVEL = 15;
 const MAX_LEN = 200;
 const COOLDOWN_MS = 2000;
 const PAGE = 50;
+const ONLINE_WINDOW_MS = 90 * 1000; // "activo" = avisó presencia en los últimos 90 s
 
 async function chatCollection() {
   const db = await connectToDatabase();
@@ -39,7 +40,9 @@ router.get("/chat-messages", async (req, res) => {
     } else {
       docs = (await col.find({}).sort({ _id: -1 }).limit(PAGE).toArray()).reverse();
     }
-    return res.status(200).json({ messages: docs.map(toPublic), min_level: CHAT_MIN_LEVEL });
+    const users = await getUsersCollection();
+    const online = await users.countDocuments({ last_seen: { $gt: new Date(Date.now() - ONLINE_WINDOW_MS) } });
+    return res.status(200).json({ messages: docs.map(toPublic), min_level: CHAT_MIN_LEVEL, online });
   } catch (err) {
     console.error("Error en /chat-messages:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
@@ -79,6 +82,24 @@ router.post("/chat-send", async (req, res) => {
     return res.status(200).json({ message: toPublic(doc) });
   } catch (err) {
     console.error("Error en /chat-send:", err);
+    return res.status(500).json({ error: "Error interno del servidor." });
+  }
+});
+
+/**
+ * POST /api/presence-ping
+ * Body: { minecraft_username, session_token } — marca al jugador como activo ahora.
+ */
+router.post("/presence-ping", async (req, res) => {
+  try {
+    const { minecraft_username, session_token } = req.body || {};
+    if (!minecraft_username || !session_token) return res.status(400).json({ error: "Faltan campos." });
+    const users = await getUsersCollection();
+    const r = await users.updateOne({ minecraft_username, session_token }, { $set: { last_seen: new Date() } });
+    if (!r.matchedCount) return res.status(401).json({ error: "Sesión inválida." });
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error("Error en /presence-ping:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
   }
 });
