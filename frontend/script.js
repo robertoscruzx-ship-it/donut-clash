@@ -718,8 +718,8 @@ function formatWonAmount(n) {
   const v = Number(n) || 0;
   return Math.abs(v) < 1000 ? v.toFixed(2) : formatCompactBalance(v);
 }
-// Anima "+cantidad" apareciendo junto al pago, subiendo con una flecha hasta el
-// saldo del header y desapareciendo. Resuelve cuando termina (ahí se suma el saldo).
+// Muestra "+cantidad" junto al pago y se desvanece despacio, como el "You win".
+// Resuelve cuando desaparece (ahí se suma el saldo).
 function flyWinToBalance(amount){
   const from = $("coinPayout"), to = balanceValue;
   if (!from || !to || !document.body.animate) return Promise.resolve();
@@ -729,58 +729,17 @@ function flyWinToBalance(amount){
   el.textContent = `+${formatWonAmount(amount)}`;
   document.body.appendChild(el);
   const w = el.offsetWidth, h = el.offsetHeight;
-  // Trayecto totalmente vertical: misma X (centro del saldo) de inicio a fin.
-  const x = b.left + b.width / 2 - w / 2;
-  const y0 = a.top + a.height / 2 - h / 2;
-  const y1 = b.top + b.height / 2 - h / 2;
-  el.style.left = "0"; el.style.top = "0";
-  const T = (y, sc) => `translate(${x}px,${y}px) scale(${sc})`;
-  const anim = el.animate([
-    { transform: T(y0, 0.6), opacity: 0 },
-    { transform: T(y0, 1.12), opacity: 1, offset: 0.16 },
-    { transform: T(y0, 1), opacity: 1, offset: 0.26 },
-    { transform: T(y0, 1), opacity: 1, offset: 0.36 },
-    { transform: T(y1, 0.9), opacity: 1, offset: 0.86 },
-    { transform: T(y1, 0.7), opacity: 0 },
-  ], { duration: 1000, easing: "ease-in-out", fill: "forwards" });
-  return anim.finished.catch(() => {}).then(() => {
-    el.remove();
-    spawnSparks(b.left + b.width / 2, b.top + b.height / 2);
-  });
+  // Misma X que el saldo del header, a la altura de "1.85x payout".
+  el.style.left = `${b.left + b.width / 2 - w / 2}px`;
+  el.style.top = `${a.top + a.height / 2 - h / 2}px`;
+  const anim = el.animate([{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 1, offset: 0.4 }, { opacity: 0 }],
+    { duration: 2200, easing: "ease-out", fill: "forwards" });
+  return anim.finished.catch(() => {}).then(() => el.remove());
 }
-// Chispas verdes discretas al llegar al saldo.
-function spawnSparks(cx, cy) {
-  if (!document.body.animate) return;
-  for (let i = 0; i < 8; i++) {
-    const sp = document.createElement("i");
-    sp.className = "win-spark";
-    sp.style.left = `${cx - 2}px`; sp.style.top = `${cy - 2}px`;
-    document.body.appendChild(sp);
-    const ang = (Math.PI * 2 * i) / 8, d = 26 + Math.random() * 8;
-    sp.animate([
-      { transform: "translate(0,0) scale(1)", opacity: 1 },
-      { transform: `translate(${Math.cos(ang) * d}px,${Math.sin(ang) * d}px) scale(.3)`, opacity: 0 },
-    ], { duration: 420, easing: "ease-out" }).finished.catch(() => {}).then(() => sp.remove());
-  }
-}
-// El saldo del header sube hasta el nuevo valor con un destello verde.
-function countUpBalance(to) {
-  const from = state.balance, start = performance.now(), dur = 450;
-  balanceValue.style.display = "inline-block";
-  if (balanceValue.animate) {
-    balanceValue.animate([
-      { transform: "scale(1)", color: "" },
-      { transform: "scale(1.22)", color: "#36d399", offset: 0.35 },
-      { transform: "scale(1)", color: "" },
-    ], { duration: 600, easing: "ease-out" });
-  }
-  const step = (now) => {
-    const k = Math.min(1, (now - start) / dur);
-    state.balance = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3)));
-    updateBalanceDisplay();
-    if (k < 1) requestAnimationFrame(step); else setBalance(to);
-  };
-  requestAnimationFrame(step);
+// El saldo del header destella de blanco a verde un momento.
+function flashBalance() {
+  if (!balanceValue.animate) return;
+  balanceValue.animate([{ color: "#36d399" }, { color: "#36d399", offset: 0.35 }, { color: "" }], { duration: 1100, easing: "ease-out" });
 }
 let coinIdleTimer = null;
 function coinIdle(startDeg = 0){
@@ -847,7 +806,8 @@ function renderCoinflip(){
       if (d.won) {
         const won = Math.max(0, d.balance - state.balance + bet);
         await flyWinToBalance(won);
-        countUpBalance(d.balance);
+        setBalance(d.balance);
+        flashBalance();
       } else {
         setBalance(d.balance);
       }
