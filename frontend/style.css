@@ -441,7 +441,6 @@ body{
 .stage-title{position:absolute; top:14px; left:18px; font-weight:700; color:var(--muted);}
 .game-stage .mines-grid{margin-top:56px;}
 .game-stage .coin{margin-top:120px; font-size:5rem;}
-.crash-players{position:absolute; top:14px; right:18px; font-size:.75rem; z-index:2;}
 .crash-history{display:flex; justify-content:flex-start; gap:6px; flex-wrap:nowrap; overflow:hidden; margin-bottom:14px; padding:2px 0; -webkit-mask-image:linear-gradient(to right,#000 0,#000 90%,transparent 100%); mask-image:linear-gradient(to right,#000 0,#000 90%,transparent 100%);}
 .crash-chip{flex:0 0 auto; font-size:.75rem; font-weight:700; padding:4px 8px; border-radius:6px; background:var(--panel-alt); border:1px solid var(--border); color:var(--text);}
 .crash-chip.win{color:#36d399; border-color:#36d399;}
@@ -565,3 +564,24 @@ body{
 .coin-payout{position:absolute; top:18px; left:0; right:0; text-align:center; font-size:1.05rem; font-weight:800; letter-spacing:.5px; color:rgba(156,163,175,.7); z-index:2;}
 .btn-primary.waiting:disabled{background:#4b5563; color:#d1d5db; opacity:1; cursor:not-allowed;}
 .win-fly{position:fixed; z-index:9999; pointer-events:none; padding:2px 9px; font-weight:800; font-size:1.05rem; font-variant-numeric:tabular-nums; color:#36d399; background:rgba(54,211,153,.2); border-radius:0; white-space:nowrap;}
+
+.crash-layout .game-stage{grid-column:1; grid-row:1;}
+.crash-layout .bet-panel{grid-column:2; grid-row:1 / span 2;}
+.crash-table{grid-column:1; grid-row:2; background:var(--panel-alt); border:1px solid var(--border); border-radius:12px; overflow:hidden;}
+.ct-head{display:flex; justify-content:space-between; align-items:center; padding:12px 16px; font-weight:800; font-size:.95rem;}
+.ct-ingame{color:var(--muted); font-weight:700;}
+.ct-head .coin-icon,.ct-bet .coin-icon{width:16px; height:16px; vertical-align:middle;}
+.ct-body{max-height:300px; overflow-y:auto;}
+.ct-row{display:flex; align-items:center; gap:12px; padding:8px 16px; border-top:1px solid var(--border-soft); background:rgba(255,255,255,.02);}
+.ct-level{min-width:26px; text-align:center; padding:3px 6px; border-radius:6px; background:var(--panel); border:1px solid var(--border); font-size:.75rem; font-weight:700; color:var(--muted);}
+.ct-avatar{width:30px; height:30px; border-radius:50%; image-rendering:pixelated;}
+.ct-who{flex:1; min-width:0; text-align:left;}
+.ct-name{font-weight:800; font-size:.9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.ct-bet{font-size:.85rem; font-weight:700; color:var(--text);}
+.ct-status{font-weight:800; font-size:.9rem; text-align:right;}
+.ct-wait{color:var(--muted);}
+.ct-win{color:#36d399;}
+.ct-loss{color:var(--danger);}
+.ct-playing{color:var(--text); animation:ctBlink 1s ease-in-out infinite;}
+@keyframes ctBlink{0%,100%{opacity:1;}50%{opacity:.3;}}
+@media (max-width:900px){.crash-layout .game-stage,.crash-layout .bet-panel,.crash-table{grid-column:1; grid-row:auto;}}

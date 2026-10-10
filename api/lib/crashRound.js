@@ -41,7 +41,7 @@ const { GROWTH_RATE, crashPointFromRoll, multiplierAtTime } = require("./crash")
 const { evaluateExposure } = require("./bankroll");
 const { logBet } = require("./betlog");
 const { getUserBySession } = require("./session");
-const { xpForBet } = require("./xp");
+const { xpForBet, levelInfo } = require("./xp");
 
 const BETTING_WINDOW_MS = 10000;
 const CRASH_CLIENT_SEED = "global-crash-round";
@@ -300,6 +300,7 @@ function toPublicRound(round, viewerUsername) {
       bet_amount: b.bet_amount,
       cashed_out: b.cashed_out,
       cashout_multiplier: b.cashout_multiplier,
+      payout: b.payout || 0,
     })),
   };
 
@@ -325,7 +326,21 @@ function toPublicRound(round, viewerUsername) {
   return base;
 }
 
+// Añade `level` a cada apuesta de una ronda pública (para la tabla de
+// jugadores). Una sola consulta por llamada; solo lee el XP de los
+// usuarios que apostaron en la ronda.
+async function attachBetLevels(publicRound) {
+  const names = (publicRound.bets || []).map((b) => b.minecraft_username);
+  if (!names.length) return publicRound;
+  const users = await getUsersCollection();
+  const docs = await users.find({ minecraft_username: { $in: names } }, { projection: { minecraft_username: 1, xp: 1 } }).toArray();
+  const xpBy = new Map(docs.map((u) => [u.minecraft_username, u.xp || 0]));
+  publicRound.bets = publicRound.bets.map((b) => ({ ...b, level: levelInfo(xpBy.get(b.minecraft_username) || 0).level }));
+  return publicRound;
+}
+
 module.exports = {
+  attachBetLevels,
   BETTING_WINDOW_MS,
   getCurrentRound,
   joinCurrentRound,

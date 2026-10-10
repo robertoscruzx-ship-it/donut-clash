@@ -15,6 +15,7 @@ const {
   cashoutCurrentRound,
   getRecentCrashHistory,
   toPublicRound,
+  attachBetLevels,
 } = require("../crashRound");
 
 const router = express.Router();
@@ -224,7 +225,7 @@ router.post("/games-crash-state", async (req, res) => {
     const { minecraft_username } = req.body || {};
     const round = await getCurrentRound();
     const history = await getRecentCrashHistory(20);
-    return res.status(200).json({ ...toPublicRound(round, minecraft_username), history });
+    return res.status(200).json({ ...(await attachBetLevels(toPublicRound(round, minecraft_username))), history });
   } catch (err) {
     console.error("Error en /games-crash-state:", err);
     return res.status(500).json({ error: "Error interno del servidor." });
@@ -246,7 +247,7 @@ router.post("/games-crash-join", async (req, res) => {
 
     const round = await joinCurrentRound(minecraft_username, session_token, bet);
     const history = await getRecentCrashHistory(20);
-    return res.status(200).json({ ...toPublicRound(round, minecraft_username), history });
+    return res.status(200).json({ ...(await attachBetLevels(toPublicRound(round, minecraft_username))), history });
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error("Error en /games-crash-join:", err);

@@ -978,7 +978,7 @@ function renderCrash(){
          <text id="crashRocket" class="crash-rocket" x="0" y="0" style="opacity:0">🚀</text>
        </svg>
      </div>
-     <div class="crash-players muted small" id="crashPlayers"></div>`,
+`,
     `<label class="bet-label" data-i18n="bet.autoCashout">Auto Cashout</label>
      <div class="bet-row">
        <input type="number" id="autoAt" min="1.01" step="0.01" placeholder="—">
@@ -986,6 +986,8 @@ function renderCrash(){
      </div>`, "game.crash.join");
   // Franja de historial ENCIMA de todo el juego (más antiguas se desvanecen a la izquierda).
   crashHistLast = null;
+  gameView.querySelector(".game-layout").classList.add("crash-layout");
+  gameView.querySelector(".game-layout").insertAdjacentHTML("beforeend", `<section class="crash-table" id="crashTable"><div class="ct-head"><span id="ctCount"></span><span id="ctTotal"></span></div><div class="ct-body" id="ctBody"></div></section>`);
   gameView.insertAdjacentHTML("afterbegin", '<div class="crash-history" id="crashHistory"></div>');
   gameView.querySelectorAll("[data-at]").forEach((b) => { b.onclick = () => { $("autoAt").value = b.dataset.at; }; });
   $("actionBtn").onclick = crashAction;
@@ -1161,12 +1163,7 @@ function crashApplyState(d){
   c.cashedOut = !!(d.my_bet && d.my_bet.cashed_out);
 
   renderCrashHistory(d.history);
-  const playersEl = $("crashPlayers");
-  if (playersEl) {
-    playersEl.textContent = d.players_count
-      ? `${d.players_count} ${t("game.crash.playersInRound")} · ${d.total_wagered} ${t("donuts")}`
-      : t("game.crash.noPlayersYet");
-  }
+  renderCrashTable(d);
 
   if (d.status === "betting") {
     crashSetFormLocked(c.joined);
@@ -1185,6 +1182,36 @@ function crashApplyState(d){
       else say(t("game.crash.crashed"));
     }
   }
+}
+
+// Formato corto para la tabla: 5000 -> "5K", 8300 -> "8.3K" (hasta 2 decimales, sin ceros sobrantes).
+function fmtShort(n) {
+  const v = Number(n) || 0;
+  for (const [suf, x] of [["B", 1e9], ["M", 1e6], ["K", 1e3]]) {
+    if (Math.abs(v) >= x) return `${parseFloat((Math.trunc((v / x) * 100) / 100).toFixed(2))}${suf}`;
+  }
+  return String(Math.trunc(v));
+}
+const escHtml = (x) => String(x).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+// Tabla de jugadores de la ronda actual (se vacía sola al empezar la siguiente ronda).
+function renderCrashTable(d) {
+  const body = $("ctBody");
+  if (!body) return;
+  const bets = (d.bets || []).slice().sort((a, b) => b.bet_amount - a.bet_amount);
+  $("ctCount").textContent = `${bets.length} ${bets.length === 1 ? t("game.crash.player") : t("game.crash.players")}`;
+  $("ctTotal").innerHTML = `${fmtShort(d.total_wagered || 0)} <span class="coin-icon"></span> <span class="ct-ingame">${t("game.crash.inGame")}</span>`;
+  body.innerHTML = bets.map((b) => {
+    let status;
+    if (b.cashed_out) status = `<span class="ct-win">${fmtShort(b.payout)} — ${Number(b.cashout_multiplier).toFixed(2)}x</span>`;
+    else if (d.status === "running") status = `<span class="ct-playing">${t("game.crash.playing")}</span>`;
+    else if (d.status === "crashed") status = `<span class="ct-loss">-${fmtShort(b.bet_amount)}</span>`;
+    else status = `<span class="ct-wait">—</span>`;
+    const name = escHtml(b.minecraft_username);
+    return `<div class="ct-row"><span class="ct-level">${b.level || 1}</span>
+      <img class="ct-avatar" src="https://mc-heads.net/avatar/${encodeURIComponent(b.minecraft_username)}/48" alt="">
+      <div class="ct-who"><div class="ct-name">${name}</div><div class="ct-bet">${fmtShort(b.bet_amount)} <span class="coin-icon"></span></div></div>
+      <div class="ct-status">${status}</div></div>`;
+  }).join("");
 }
 
 let crashHistLast = null;
