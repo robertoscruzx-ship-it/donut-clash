@@ -1072,8 +1072,6 @@ function crashRenderGraph(status, round){
   const plotW = g.width - g.left - g.right;
   const plotH = g.height - g.top - g.bottom;
   const baselineY = g.top + plotH;
-  const now = performance.now();
-
   const running = round && (status === "running" || status === "crashed");
   const rate = running ? round.growth_rate : 0;
   const elapsed = !running ? 0 : (status === "crashed"
@@ -1081,26 +1079,10 @@ function crashRenderGraph(status, round){
     : Math.max(0, (Date.now() - round.round_start) / 1000));
   const currentM = running ? Math.exp(rate * elapsed) : 1;
 
-  // Vista objetivo (solo crece dentro de la misma ronda) y vista mostrada (suavizada).
-  const roundKey = round ? round.round_number : null;
-  if (!c.view || c.viewRound !== roundKey || !running) {
-    if (!running || c.viewRound !== roundKey) {
-      c.view = { T: 8, M: 2 }; c.target = { T: 8, M: 2 }; c.viewRound = roundKey; c.viewAt = now;
-      c.snapView = running; // si se entra a mitad de ronda, la vista salta directo (sin transición)
-    }
-  }
-  if (running) {
-    const tv = crashTargetView(elapsed, currentM);
-    c.target = { T: Math.max(c.target.T, tv.T), M: Math.max(c.target.M, tv.M) };
-    if (c.snapView) { c.view = { ...c.target }; c.snapView = false; }
-  }
-  const dt = Math.min(0.1, Math.max(0, (now - (c.viewAt || now)) / 1000));
-  c.viewAt = now;
-  const k = 1 - Math.exp(-dt * 7); // transición suave (~0.4 s)
-  c.view.T += (c.target.T - c.view.T) * k;
-  c.view.M += (c.target.M - c.view.M) * k;
-  const viewT = c.view.T, viewM = c.view.M;
-  crashRenderAxes(viewT, viewM, c.target.T, c.target.M);
+  // Cámara continua (como antes): la vista siempre sigue a la nave con un 15% de margen.
+  const viewT = Math.max(elapsed * 1.15, 8);
+  const viewM = Math.max(currentM * 1.15, 2);
+  crashRenderAxes(viewT, viewM, viewT, viewM);
 
   if (!running) {
     line.setAttribute("d", "");
