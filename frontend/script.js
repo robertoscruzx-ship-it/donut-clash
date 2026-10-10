@@ -985,6 +985,7 @@ function renderCrash(){
        <button class="chip" data-at="2">2x</button><button class="chip" data-at="10">10x</button>
      </div>`, "game.crash.join");
   // Franja de historial ENCIMA de todo el juego (más antiguas se desvanecen a la izquierda).
+  crashHistLast = null;
   gameView.insertAdjacentHTML("afterbegin", '<div class="crash-history" id="crashHistory"></div>');
   gameView.querySelectorAll("[data-at]").forEach((b) => { b.onclick = () => { $("autoAt").value = b.dataset.at; }; });
   $("actionBtn").onclick = crashAction;
@@ -1186,13 +1187,29 @@ function crashApplyState(d){
   }
 }
 
+let crashHistLast = null;
 function renderCrashHistory(history){
   const el = $("crashHistory");
   if (!el) return;
-  el.innerHTML = (history || []).map((h) => {
+  // Más reciente primero (izquierda); las anteriores se corren hacia la derecha.
+  const list = (history || []).slice().reverse();
+  const newest = list.length ? list[0].round_number : null;
+  const isNew = crashHistLast !== null && newest !== null && newest !== crashHistLast;
+  el.innerHTML = list.map((h) => {
     const cls = h.crash_point >= 2 ? "crash-chip win" : "crash-chip lose";
     return `<span class="${cls}">${h.crash_point.toFixed(2)}x</span>`;
   }).join("");
+  crashHistLast = newest;
+  if (isNew && el.firstElementChild && el.animate) {
+    const first = el.firstElementChild;
+    const shift = first.getBoundingClientRect().width + 6; // ancho de la nueva + gap
+    [...el.children].forEach((c, i) => {
+      c.animate(i === 0
+        ? [{ transform: `translateX(-${shift}px)`, opacity: 0 }, { transform: "translateX(0)", opacity: 1 }]
+        : [{ transform: `translateX(-${shift}px)` }, { transform: "translateX(0)" }],
+        { duration: 500, easing: "cubic-bezier(.2,.8,.2,1)" });
+    });
+  }
 }
 
 // Bucle visual: interpola el multiplicador entre sondeos del servidor para
