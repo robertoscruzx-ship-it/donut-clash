@@ -166,8 +166,19 @@ async function apiFetch(path, options = {}){
   if (!res.ok) { const e = new Error(data.error || "Network error"); e.status = res.status; e.data = data; throw e; }
   return data;
 }
+// Solo para el saldo del header: 573210 -> "573.21K" (siempre 2 decimales, truncado).
+function formatCompactBalance(n) {
+  const v = Number(n) || 0;
+  const units = [["T", 1e12], ["B", 1e9], ["M", 1e6], ["K", 1e3]];
+  for (const [suffix, value] of units) {
+    if (Math.abs(v) >= value) {
+      return `${(Math.trunc((v / value) * 100) / 100).toFixed(2)}${suffix}`;
+    }
+  }
+  return String(v);
+}
 function updateBalanceDisplay(){
-  balanceValue.textContent = state.balance;
+  balanceValue.textContent = formatCompactBalance(state.balance);
   if (accountBalanceValue) accountBalanceValue.textContent = state.balance;
   if (walletBalanceValue) walletBalanceValue.textContent = state.balance;
 }
