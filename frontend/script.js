@@ -977,7 +977,7 @@ function renderCrash(){
          <g id="crashAxisX"></g>
        </svg>
        <div class="crash-labels" id="crashLabels"></div>
-       <div class="crash-rocket" id="crashRocket" style="opacity:0">🚀</div>
+       <div class="crash-rocket" id="crashRocket" style="opacity:0"></div>
      </div>
 `,
     `<label class="bet-label" data-i18n="bet.autoCashout">Auto Cashout</label>
@@ -1105,6 +1105,26 @@ function crashExplode(x, y){
   ], { duration: 360, easing: "ease-out" });
 }
 
+// Color del trazo según el multiplicador: azul (hasta 25x) → rojo (25–60x) → verde (60–80x) → dorado (80x+),
+// con transiciones graduales (mezcla en escala logarítmica) para que no cambie de golpe.
+const CRASH_COLORS = [
+  { from: 1,  rgb: [37, 70, 255] },
+  { from: 25, rgb: [235, 50, 60] },
+  { from: 60, rgb: [40, 200, 90] },
+  { from: 80, rgb: [246, 195, 67] },
+];
+function crashColor(m){
+  let rgb = CRASH_COLORS[0].rgb;
+  for (let i = 1; i < CRASH_COLORS.length; i++) {
+    const b = CRASH_COLORS[i].from;
+    if (m < b) break;
+    const k = Math.min(1, Math.log(m / b) / Math.log(1.6));
+    const a = CRASH_COLORS[i - 1].rgb, z = CRASH_COLORS[i].rgb;
+    rgb = a.map((v, j) => v + (z[j] - v) * k);
+  }
+  return rgb.map((v) => Math.round(v));
+}
+
 function crashRenderGraph(status, round){
   const svg = $("crashSvg");
   const line = $("crashLine"), area = $("crashArea"), rocket = $("crashRocket");
@@ -1149,6 +1169,13 @@ function crashRenderGraph(status, round){
   line.setAttribute("d", crashBuildPath(points));
   area.setAttribute("d", crashBuildArea(points, baselineY));
   svg.classList.toggle("crashed", status === "crashed");
+  const col = crashColor(currentM);
+  const colStr = `rgb(${col[0]},${col[1]},${col[2]})`;
+  line.style.stroke = status === "crashed" ? "" : colStr;
+  const stops = svg.querySelectorAll("#crashFillGrad stop");
+  stops.forEach((st) => st.setAttribute("stop-color", status === "crashed" ? "#ff4d4d" : colStr));
+  rocket.style.background = colStr;
+  rocket.style.boxShadow = `0 0 12px 3px ${colStr}`;
 
   const last = points[points.length - 1];
   const prev = points[points.length - 4] || points[0];
@@ -1157,26 +1184,16 @@ function crashRenderGraph(status, round){
   const angle = Math.atan2((last.y - prev.y) * sy, (last.x - prev.x) * sx) * (180 / Math.PI);
   rocket.style.left = `${(last.x / g.width * 100).toFixed(3)}%`;
   rocket.style.top = `${(last.y / g.height * 100).toFixed(3)}%`;
-  rocket.style.transform = `translate(-50%,-50%) rotate(${(angle + 45).toFixed(1)}deg)`;
-  rocket.textContent = status === "crashed" ? "💥" : "🚀";
-  if (c.fx && status === "running") {
-    // Llama 3D animada detrás del cohete (el cohete sigue siendo el emoji 🚀).
+  rocket.style.transform = "translate(-50%,-50%)";
+  if (c.fx) c.fx.hide();
+  if (status === "running") {
     rocket.style.opacity = "1";
-    c.fx.draw({
-      x: last.x * sx, y: last.y * sy,
-      angle: angle * Math.PI / 180,
-      mult: currentM, time: now / 1000,
-    });
   } else {
-    if (c.fx) c.fx.hide();
-    rocket.style.opacity = "1";
+    rocket.style.opacity = "0";
     if (status === "crashed" && c.explodedRound !== round.round_number) {
       c.explodedRound = round.round_number;
       // Solo se anima si el choque es reciente (no al entrar a ver una ronda que ya explotó).
-      if (!round.crash_at || Date.now() - round.crash_at < 4000) {
-        crashExplode(last.x * sx, last.y * sy);
-        if (rocket.animate) rocket.animate([{ transform: `translate(-50%,-50%) scale(.3)`, opacity: 0 }, { transform: `translate(-50%,-50%) scale(1.5)`, opacity: 1, offset: 0.35 }, { transform: `translate(-50%,-50%) scale(1)`, opacity: 1 }], { duration: 500, easing: "ease-out" });
-      }
+      if (!round.crash_at || Date.now() - round.crash_at < 4000) crashExplode(last.x * sx, last.y * sy);
     }
   }
 }
